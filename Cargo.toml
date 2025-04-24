@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "A pure Rust implementation of Diskless Topics"
 license = "Apache-2.0"
+repository = "https://github.com/ilikepi63/riskless"
 
 [dependencies]
 object_store = "0.12.0"
