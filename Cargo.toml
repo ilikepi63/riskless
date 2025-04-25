@@ -7,5 +7,9 @@ license = "Apache-2.0"
 repository = "https://github.com/ilikepi63/riskless"
 
 [dependencies]
-object_store = "0.12.0"
-uuid = "1.16.0"
+object_store = "0.12"
+thiserror = "2"
+uuid = { version = "1.16", features = ["v4"] }
+tokio = { version = "1", features = ["full"] }
+bytes = "1.10.1"
+tracing = "0.1.41"

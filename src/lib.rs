@@ -1,6 +1,7 @@
-mod client;
+mod broker;
 mod coordinator;
-mod requests;
+mod messages;
 mod segment;
 
-pub use client::Client;
+pub use broker::Broker;
+pub mod error;

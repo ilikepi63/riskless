@@ -154,7 +154,7 @@ pub struct FileToDelete {
 pub struct DeleteFilesRequest {
     object_key_paths: HashSet<String>,
 }
-pub trait BatchCoordinator {
+pub trait BatchCoordinator where Self: Send + Sync {
     /// This operation is called when a Diskless partition
     /// (or a topic with one or more partitions) is created in the cluster.
     /// The Batch Coordinator initializes the corresponding logs.
