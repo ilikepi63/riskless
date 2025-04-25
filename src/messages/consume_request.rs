@@ -1,7 +1,7 @@
 pub struct ConsumeRequest {
-    topic: String,
-    partition: u64,
-    offset: u64,
+    pub topic: String,
+    pub partition: u64,
+    pub offset: u64,
 }
 
 
