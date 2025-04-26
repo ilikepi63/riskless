@@ -63,7 +63,6 @@ impl Broker {
                     let mut buffer_lock = buffer.write().await;
 
                     if buffer_lock.size() > 0 {
-                        // The
                         let buffer = buffer_lock.clone();
 
                         buffer_lock.clear();

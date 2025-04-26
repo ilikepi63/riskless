@@ -1,4 +1,4 @@
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::{hash_map::{Entry, Values}, HashMap};
 
 use crate::{coordinator::TopicIdPartition, error::RisklessResult};
 
@@ -49,5 +49,9 @@ impl ProduceRequestCollection {
 
     pub fn size(&self) -> u64 {
         self.size
+    }
+
+    pub fn iter_partitions<'a>(&'a mut self) -> Values<'a, TopicIdPartition, Vec<ProduceRequest> > {
+        self.inner.values()
     }
 }
