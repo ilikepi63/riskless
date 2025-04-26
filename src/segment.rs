@@ -1,13 +1,13 @@
 use bytes::Bytes;
 
-use crate::{error::RisklessError, messages::produce_request::ProduceRequest};
+use crate::{error::RisklessError, messages::produce_request::{ProduceRequest, ProduceRequestCollection}};
 
 pub struct SharedLogSegment {}
 
-impl TryFrom<&[ProduceRequest]> for SharedLogSegment {
+impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
     type Error = RisklessError;
 
-    fn try_from(value: &[ProduceRequest]) -> Result<Self, Self::Error> {
+    fn try_from(value: ProduceRequestCollection) -> Result<Self, Self::Error> {
         // TODO
 
         Ok(SharedLogSegment {})

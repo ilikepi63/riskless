@@ -3,8 +3,8 @@ use std::vec::Vec;
 
 use std::time::SystemTime;
 
-#[derive(Debug)]
-pub struct TopicIdPartition(u64, u64);
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct TopicIdPartition(pub String, pub u64);
 
 #[derive(Debug)]
 enum TimestampType {}

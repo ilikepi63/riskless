@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use object_store::{ObjectStore, PutPayload, path::Path};
@@ -11,8 +8,10 @@ use crate::{
     coordinator::{BatchCoordinator, DefaultBatchCoordinator},
     error::RisklessResult,
     messages::{
-        consume_request::ConsumeRequest, consume_response::ConsumeResponse,
-        produce_request::ProduceRequest, produce_response::ProduceResponse,
+        consume_request::ConsumeRequest,
+        consume_response::ConsumeResponse,
+        produce_request::{ProduceRequest, ProduceRequestCollection},
+        produce_response::ProduceResponse,
     },
     segment::SharedLogSegment,
 };
@@ -44,7 +43,8 @@ impl Broker {
         let object_store_ref = config.object_store.clone();
 
         tokio::task::spawn(async move {
-            let buffer: Arc<RwLock<Vec<ProduceRequest>>> = Arc::new(RwLock::new(vec![]));
+            let buffer: Arc<RwLock<ProduceRequestCollection>> =
+                Arc::new(RwLock::new(ProduceRequestCollection::new()));
             let cloned_buffer_ref = buffer.clone();
 
             let (flush_tx, mut flush_rx) = tokio::sync::mpsc::channel::<()>(1);
@@ -62,15 +62,16 @@ impl Broker {
 
                     let mut buffer_lock = buffer.write().await;
 
-                    if buffer_lock.len() > 0 {
+                    if buffer_lock.size() > 0 {
+                        // The
                         let buffer = buffer_lock.clone();
 
-                        *buffer_lock = vec![]; // TODO: allocation here? Maybe we just copy the contents?
+                        buffer_lock.clear();
 
                         drop(buffer_lock); // Explicitly drop the lock.
 
                         if let Err(err) = flush_buffer(
-                            &buffer,
+                            buffer,
                             object_store_ref.clone(),
                             batch_coordinator_ref.clone(),
                         )
@@ -90,11 +91,11 @@ impl Broker {
                 while let Some(req) = rx.recv().await {
                     let mut buffer_lock = cloned_buffer_ref.write().await;
 
-                    buffer_lock.push(req);
+                    let _ = buffer_lock.collect(req);
 
-                    // TODO: Have a size check for how big this buffer actually is (as in the size of the underlying ProductRequests)
-                    if buffer_lock.len() > 1 {
-                        flush_tx.send(());
+                    // TODO: This is currently hardcoded to 50kb, but we possibly want to make
+                    if buffer_lock.size() > 50_000 {
+                        let _ = flush_tx.send(()).await;
                     }
                 }
 
@@ -113,9 +114,6 @@ impl Broker {
 
         Ok(ProduceResponse {})
 
-        // The broker accumulates Produce requests in a buffer until exceeding some size or time limit.
-        // When enough data accumulates or the timeout elapses, the Broker creates a shared log segment and batch coordinates for all of the buffered batches.
-        // The shared log segment is uploaded to object storage and is written durably.
         // The broker commits the batch coordinates with the Batch Coordinator (described in details in KIP-1164).
         // The Batch Coordinator assigns offsets to the written batches, persists the batch coordinates, and responds to the Broker.
         // The broker sends responses to all Produce requests that are associated with the committed object.
@@ -133,7 +131,7 @@ impl Broker {
 }
 
 async fn flush_buffer(
-    reqs: &[ProduceRequest],
+    reqs: ProduceRequestCollection,
     object_storage: Arc<dyn ObjectStore>,
     batch_coordinator: Arc<dyn BatchCoordinator>,
 ) -> RisklessResult<()> {
