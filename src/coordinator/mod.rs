@@ -3,11 +3,17 @@ use std::vec::Vec;
 
 use std::time::SystemTime;
 
+use crate::messages::commit_batch_request::CommitBatchRequest;
+
+pub mod default_impl;
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct TopicIdPartition(pub String, pub u64);
 
 #[derive(Debug)]
-enum TimestampType {}
+pub enum TimestampType {
+    Dummy
+}
 
 #[derive(Debug)]
 pub struct CreateTopicAndPartitionsRequest {
@@ -16,21 +22,6 @@ pub struct CreateTopicAndPartitionsRequest {
     num_partitions: i32,
 }
 
-#[derive(Debug)]
-pub struct CommitBatchRequest {
-    request_id: i32,
-    topic_id_partition: TopicIdPartition,
-    byte_offset: i64,
-    size: i32,
-    base_offset: i64,
-    last_offset: i64,
-    batch_max_timestamp: i64,
-    message_timestamp_type: TimestampType,
-    producer_id: i64,
-    producer_epoch: i16,
-    base_sequence: i32,
-    last_sequence: i32,
-}
 
 #[derive(Debug)]
 pub struct CommitBatchResponse {
@@ -177,7 +168,7 @@ pub trait BatchCoordinator where Self: Send + Sync {
     /// Returns an error if an unexpected error occurs.
     fn commit_file(
         &self,
-        object_key: String,
+        object_key: [u8; 16],
         uploader_broker_id: i32,
         file_size: i64,
         batches: Vec<CommitBatchRequest>,
@@ -237,59 +228,4 @@ pub trait BatchCoordinator where Self: Send + Sync {
     fn delete_files(&self, request: DeleteFilesRequest);
 
     fn is_safe_to_delete_file(&self, object_key: String) -> bool;
-}
-pub struct DefaultBatchCoordinator {}
-
-impl DefaultBatchCoordinator {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl BatchCoordinator for DefaultBatchCoordinator {
-    fn create_topic_and_partitions(&self, requests: HashSet<CreateTopicAndPartitionsRequest>) {
-        todo!()
-    }
-
-    fn commit_file(
-        &self,
-        object_key: String,
-        uploader_broker_id: i32,
-        file_size: i64,
-        batches: Vec<CommitBatchRequest>,
-    ) -> Vec<CommitBatchResponse> {
-        todo!()
-    }
-
-    fn find_batches(
-        &self,
-        find_batch_requests: Vec<FindBatchRequest>,
-        fetch_max_bytes: i32,
-    ) -> Vec<FindBatchResponse> {
-        todo!()
-    }
-
-    fn list_offsets(&self, requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse> {
-        todo!()
-    }
-
-    fn delete_records(&self, requests: Vec<DeleteRecordsRequest>) -> Vec<DeleteRecordsResponse> {
-        todo!()
-    }
-
-    fn delete_topics(&self, topic_ids: HashSet<uuid::Uuid>) {
-        todo!()
-    }
-
-    fn get_files_to_delete(&self) -> Vec<FileToDelete> {
-        todo!()
-    }
-
-    fn delete_files(&self, request: DeleteFilesRequest) {
-        todo!()
-    }
-
-    fn is_safe_to_delete_file(&self, object_key: String) -> bool {
-        todo!()
-    }
 }

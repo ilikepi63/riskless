@@ -5,9 +5,10 @@ use object_store::{ObjectStore, PutPayload, path::Path};
 use tokio::sync::RwLock;
 
 use crate::{
-    coordinator::{BatchCoordinator, DefaultBatchCoordinator},
+    coordinator::{BatchCoordinator, default_impl::DefaultBatchCoordinator},
     error::RisklessResult,
     messages::{
+        commit_batch_request::CommitBatchRequest,
         consume_request::ConsumeRequest,
         consume_response::ConsumeResponse,
         produce_request::{ProduceRequest, ProduceRequestCollection},
@@ -25,15 +26,6 @@ pub struct Broker {
 pub struct BrokerConfiguration {
     object_store: Arc<dyn ObjectStore>,
     batch_coordinator: Arc<dyn BatchCoordinator>,
-}
-
-impl Default for BrokerConfiguration {
-    fn default() -> Self {
-        Self {
-            object_store: Arc::new(object_store::local::LocalFileSystem::new()),
-            batch_coordinator: Arc::new(DefaultBatchCoordinator::new()),
-        }
-    }
 }
 
 impl Broker {
@@ -60,14 +52,20 @@ impl Broker {
                         _recv = flush_rx.recv() => {}
                     };
 
+                    println!("This is ticking!");
+
                     let mut buffer_lock = buffer.write().await;
 
                     if buffer_lock.size() > 0 {
+                        println!("Buffer is not empty!");
+
                         let buffer = buffer_lock.clone();
 
                         buffer_lock.clear();
 
                         drop(buffer_lock); // Explicitly drop the lock.
+
+                        println!("We are flishing the buffer!");
 
                         if let Err(err) = flush_buffer(
                             buffer,
@@ -76,10 +74,7 @@ impl Broker {
                         )
                         .await
                         {
-                            tracing::error!(
-                                "Error occurred when trying to flush buffer: {:#?}",
-                                err
-                            );
+                            println!("Error occurred when trying to flush buffer: {:#?}", err);
                         }
                     }
                 }
@@ -88,6 +83,7 @@ impl Broker {
             // Accumulator task.
             tokio::spawn(async move {
                 while let Some(req) = rx.recv().await {
+                    println!("Receiving the request!");
                     let mut buffer_lock = cloned_buffer_ref.write().await;
 
                     let _ = buffer_lock.collect(req);
@@ -136,18 +132,34 @@ async fn flush_buffer(
 ) -> RisklessResult<()> {
     let reqs: SharedLogSegment = reqs.try_into()?;
 
+    let batch_coords = reqs.get_batch_coords().clone();
+
     let buf: Bytes = reqs.into();
 
     let buf_size = buf.len();
 
-    let path = Path::from(uuid::Uuid::new_v4().to_string());
+    let path = uuid::Uuid::new_v4();
 
-    let _put_result = object_storage
-        .put(&path, PutPayload::from_bytes(buf))
+    let path_string = Path::from(path.to_string());
+
+    println!("Putting the Result!");
+
+    let put_result = object_storage
+        .put(&path_string, PutPayload::from_bytes(buf))
         .await?;
 
+    println!("Result from putting: {:#?}", put_result);
+
     // TODO: The responses here?
-    batch_coordinator.commit_file(path.to_string(), 1, buf_size.try_into()?, vec![]);
+    batch_coordinator.commit_file(
+        path.into_bytes(),
+        1,
+        buf_size.try_into()?,
+        batch_coords
+            .iter()
+            .map(CommitBatchRequest::from)
+            .collect::<Vec<_>>(),
+    );
 
     Ok(())
 }
@@ -158,7 +170,21 @@ mod tests {
 
     #[tokio::test]
     async fn can_produce_without_failure() -> Result<(), Box<dyn std::error::Error>> {
-        let config = BrokerConfiguration::default();
+        let mut batch_coord_path = std::env::current_dir()?;
+
+        batch_coord_path.push("index");
+
+        let mut object_store_path = std::env::current_dir()?;
+        object_store_path.push("data");
+
+        let config = BrokerConfiguration {
+            object_store: Arc::new(object_store::local::LocalFileSystem::new_with_prefix(
+                object_store_path,
+            )?),
+            batch_coordinator: Arc::new(DefaultBatchCoordinator::new(
+                batch_coord_path.to_string_lossy().to_string(),
+            )),
+        };
 
         let mut broker = Broker::new(config);
 
@@ -169,6 +195,8 @@ mod tests {
                 data: "hello".as_bytes().to_vec(),
             })
             .await?;
+
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         // TODO: assertions
 

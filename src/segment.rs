@@ -12,6 +12,7 @@ use crate::{
 
 pub struct SharedLogSegment(Vec<BatchCoordinate>, BytesMut);
 
+// TODO: ADD IN OBJECT NAME FOR COLLECTION?
 impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
     type Error = RisklessError;
 
@@ -44,10 +45,15 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
     }
 }
 
+impl SharedLogSegment{
+    pub fn get_batch_coords(&self) -> Vec<BatchCoordinate> {
+        self.0.clone()
+    }
+}
+
 impl Into<bytes::Bytes> for SharedLogSegment {
     fn into(self) -> bytes::Bytes {
-        // TODO
-        Bytes::new()
+        self.1.into()
     }
 }
 
@@ -120,7 +126,6 @@ mod tests {
 
         assert_eq!(segment.0.len(), 3); // Three batch coordinates
         assert_eq!(segment.1.len(), 9); // 3 + 2 + 4 bytes of data
-
 
         // COMMENTED as ordering is not guaranteed.
         // Verify coordinates

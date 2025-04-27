@@ -1,5 +1,5 @@
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BatchCoordinate{
     pub topic: String, 
     pub partition: u64, 
