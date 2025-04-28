@@ -1,4 +1,4 @@
-use std::num::TryFromIntError;
+use std::{array::TryFromSliceError, num::TryFromIntError};
 
 use thiserror::Error;
 
@@ -16,8 +16,12 @@ pub enum RisklessError {
     ObjectStoreError(#[from] object_store::Error),
     #[error("TryFromInt Conversion Error")]
     TryFromIntConversionError(#[from] TryFromIntError),
+    #[error("TryFromSlice Conversion Error")]
+    TryFromSliceConversionrror(#[from] TryFromSliceError),
     #[error("IO Error")]
     IoError(#[from] std::io::Error),
+    #[error("Uuid Error")]
+    UuidError(#[from] uuid::Error),
 }
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RisklessError {
