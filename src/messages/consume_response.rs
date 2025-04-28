@@ -1,1 +1,5 @@
-pub struct ConsumeResponse {}
+pub struct ConsumeResponse {
+
+    
+
+}

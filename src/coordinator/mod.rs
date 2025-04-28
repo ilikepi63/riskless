@@ -12,7 +12,7 @@ pub struct TopicIdPartition(pub String, pub u64);
 
 #[derive(Debug)]
 pub enum TimestampType {
-    Dummy
+    Dummy,
 }
 
 #[derive(Debug)]
@@ -21,7 +21,6 @@ pub struct CreateTopicAndPartitionsRequest {
     topic_name: String,
     num_partitions: i32,
 }
-
 
 #[derive(Debug)]
 pub struct CommitBatchResponse {
@@ -35,17 +34,17 @@ pub struct CommitBatchResponse {
 
 #[derive(Debug)]
 pub struct FindBatchRequest {
-    topic_id_partition: TopicIdPartition,
-    offset: i64,
-    max_partition_fetch_bytes: i32,
+    pub topic_id_partition: TopicIdPartition,
+    pub offset: u64,
+    pub max_partition_fetch_bytes: i32,
 }
 
 #[derive(Debug)]
 pub struct FindBatchResponse {
-    errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
-    batches: Vec<BatchInfo>,
-    log_start_offset: i64,
-    high_watermark: i64,
+    pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    pub batches: Vec<BatchInfo>,
+    pub log_start_offset: i64,
+    pub high_watermark: i64,
 }
 
 #[derive(Debug)]
@@ -145,7 +144,10 @@ pub struct FileToDelete {
 pub struct DeleteFilesRequest {
     object_key_paths: HashSet<String>,
 }
-pub trait BatchCoordinator where Self: Send + Sync {
+pub trait BatchCoordinator
+where
+    Self: Send + Sync,
+{
     /// This operation is called when a Diskless partition
     /// (or a topic with one or more partitions) is created in the cluster.
     /// The Batch Coordinator initializes the corresponding logs.

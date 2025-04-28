@@ -115,6 +115,9 @@ impl Broker {
     }
 
     pub async fn consume(&self, request: ConsumeRequest) -> RisklessResult<ConsumeResponse> {
+
+        
+
         // The consumer sends a Fetch request to the broker.
         // The broker queries the Batch Coordinator for the relevant batch coordinates.
         // The broker gets the data either from the object storage and/or from the cache.

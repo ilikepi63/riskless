@@ -16,6 +16,8 @@ pub enum RisklessError {
     ObjectStoreError(#[from] object_store::Error),
     #[error("TryFromInt Conversion Error")]
     TryFromIntConversionError(#[from] TryFromIntError),
+    #[error("IO Error")]
+    IoError(#[from] std::io::Error),
 }
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RisklessError {
