@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::default;
 use std::vec::Vec;
 
 use std::time::SystemTime;
@@ -7,11 +8,12 @@ use crate::messages::commit_batch_request::CommitBatchRequest;
 
 pub mod default_impl;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
 pub struct TopicIdPartition(pub String, pub u64);
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum TimestampType {
+    #[default]
     Dummy,
 }
 
@@ -19,15 +21,15 @@ pub enum TimestampType {
 pub struct CreateTopicAndPartitionsRequest {
     topic_id: uuid::Uuid,
     topic_name: String,
-    num_partitions: i32,
+    num_partitions: u32,
 }
 
 #[derive(Debug)]
 pub struct CommitBatchResponse {
     errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
-    assigned_base_offset: i64,
-    log_append_time: i64,
-    log_start_offset: i64,
+    assigned_base_offset: u64,
+    log_append_time: u64,
+    log_start_offset: u64,
     is_duplicate: bool,
     request: CommitBatchRequest,
 }
@@ -36,76 +38,76 @@ pub struct CommitBatchResponse {
 pub struct FindBatchRequest {
     pub topic_id_partition: TopicIdPartition,
     pub offset: u64,
-    pub max_partition_fetch_bytes: i32,
+    pub max_partition_fetch_bytes: u32,
 }
 
 #[derive(Debug)]
 pub struct FindBatchResponse {
     pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
     pub batches: Vec<BatchInfo>,
-    pub log_start_offset: i64,
-    pub high_watermark: i64,
+    pub log_start_offset: u64,
+    pub high_watermark: u64,
 }
 
 #[derive(Debug)]
 pub struct BatchInfo {
-    batch_id: i64,
-    object_key: String,
-    metadata: BatchMetadata,
+    pub batch_id: u64,
+    pub object_key: String,
+    pub metadata: BatchMetadata,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct BatchMetadata {
-    topic_id_partition: TopicIdPartition,
-    byte_offset: i64,
-    byte_size: i64,
-    base_offset: i64,
-    last_offset: i64,
-    log_append_timestamp: i64,
-    batch_max_timestamp: i64,
-    timestamp_type: TimestampType,
-    producer_id: i64,
-    producer_epoch: i16,
-    base_sequence: i32,
-    last_sequence: i32,
+    pub topic_id_partition: TopicIdPartition,
+    pub byte_offset: u64,
+    pub byte_size: u32,
+    pub base_offset: u64,
+    pub last_offset: u64,
+    pub log_append_timestamp: u64,
+    pub batch_max_timestamp: u64,
+    pub timestamp_type: TimestampType,
+    pub producer_id: u64,
+    pub producer_epoch: i16,
+    pub base_sequence: u32,
+    pub last_sequence: u32,
 }
 
 #[derive(Debug)]
 pub struct ListOffsetsRequest {
     topic_id_partition: TopicIdPartition,
-    timestamp: i64,
+    timestamp: u64,
 }
 
 // impl ListOffsetsRequest {
-//     pub const EARLIEST_TIMESTAMP: i64 = org
+//     pub const EARLIEST_TIMESTAMP: u64 = org
 //         .apache
 //         .kafka
 //         .common
 //         .requests
 //         .ListOffsetsRequest
 //         .EARLIEST_TIMESTAMP;
-//     pub const LATEST_TIMESTAMP: i64 = org
+//     pub const LATEST_TIMESTAMP: u64 = org
 //         .apache
 //         .kafka
 //         .common
 //         .requests
 //         .ListOffsetsRequest
 //         .LATEST_TIMESTAMP;
-//     pub const MAX_TIMESTAMP: i64 = org
+//     pub const MAX_TIMESTAMP: u64 = org
 //         .apache
 //         .kafka
 //         .common
 //         .requests
 //         .ListOffsetsRequest
 //         .MAX_TIMESTAMP;
-//     pub const EARLIEST_LOCAL_TIMESTAMP: i64 = org
+//     pub const EARLIEST_LOCAL_TIMESTAMP: u64 = org
 //         .apache
 //         .kafka
 //         .common
 //         .requests
 //         .ListOffsetsRequest
 //         .EARLIEST_LOCAL_TIMESTAMP;
-//     pub const LATEST_TIERED_TIMESTAMP: i64 = org
+//     pub const LATEST_TIERED_TIMESTAMP: u64 = org
 //         .apache
 //         .kafka
 //         .common
@@ -118,20 +120,20 @@ pub struct ListOffsetsRequest {
 pub struct ListOffsetsResponse {
     errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
     topic_id_partition: TopicIdPartition,
-    timestamp: i64,
-    offset: i64,
+    timestamp: u64,
+    offset: u64,
 }
 
 #[derive(Debug)]
 pub struct DeleteRecordsRequest {
     topic_id_partition: TopicIdPartition,
-    offset: i64,
+    offset: u64,
 }
 
 #[derive(Debug)]
 pub struct DeleteRecordsResponse {
     errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
-    low_watermark: i64,
+    low_watermark: u64,
 }
 
 #[derive(Debug)]
@@ -171,8 +173,8 @@ where
     fn commit_file(
         &self,
         object_key: [u8; 16],
-        uploader_broker_id: i32,
-        file_size: i64,
+        uploader_broker_id: u32,
+        file_size: u64,
         batches: Vec<CommitBatchRequest>,
     ) -> Vec<CommitBatchResponse>;
 
@@ -185,7 +187,7 @@ where
     fn find_batches(
         &self,
         find_batch_requests: Vec<FindBatchRequest>,
-        fetch_max_bytes: i32,
+        fetch_max_bytes: u32,
     ) -> Vec<FindBatchResponse>;
 
     /// This operation allows the broker to get the information about log offsets:

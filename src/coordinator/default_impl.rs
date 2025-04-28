@@ -1,7 +1,7 @@
 use std::{
     collections::HashSet,
     fs::{self, File, OpenOptions},
-    io::{Read, Write},
+    io::{Read, Seek, Write},
     path::{Path, PathBuf},
     thread::current,
 };
@@ -9,12 +9,16 @@ use std::{
 use bytes::{BufMut, Bytes, BytesMut};
 use uuid::Uuid;
 
-use crate::error::{RisklessError, RisklessResult};
+use crate::{
+    coordinator::{BatchInfo, TopicIdPartition},
+    error::{RisklessError, RisklessResult},
+};
 
 use super::{
-    BatchCoordinator, CommitBatchRequest, CommitBatchResponse, CreateTopicAndPartitionsRequest,
-    DeleteFilesRequest, DeleteRecordsRequest, DeleteRecordsResponse, FileToDelete,
-    FindBatchRequest, FindBatchResponse, ListOffsetsRequest, ListOffsetsResponse,
+    BatchCoordinator, BatchMetadata, CommitBatchRequest, CommitBatchResponse,
+    CreateTopicAndPartitionsRequest, DeleteFilesRequest, DeleteRecordsRequest,
+    DeleteRecordsResponse, FileToDelete, FindBatchRequest, FindBatchResponse, ListOffsetsRequest,
+    ListOffsetsResponse,
 };
 
 pub struct DefaultBatchCoordinator {
@@ -80,8 +84,8 @@ impl BatchCoordinator for DefaultBatchCoordinator {
     fn commit_file(
         &self,
         object_key: [u8; 16],
-        uploader_broker_id: i32,
-        file_size: i64,
+        uploader_broker_id: u32,
+        file_size: u64,
         batches: Vec<CommitBatchRequest>,
     ) -> Vec<CommitBatchResponse> {
         let mut results: Vec<CommitBatchResponse> = vec![];
@@ -120,9 +124,14 @@ impl BatchCoordinator for DefaultBatchCoordinator {
     fn find_batches(
         &self,
         find_batch_requests: Vec<FindBatchRequest>,
-        fetch_max_bytes: i32,
+        fetch_max_bytes: u32,
     ) -> Vec<FindBatchResponse> {
+        let mut results = vec![];
+
         for request in find_batch_requests {
+
+            let topic_id_partition = request.topic_id_partition.clone() ;
+
             let mut current_topic_dir = self.topic_dir(request.topic_id_partition.0);
 
             let current_partition_file = Self::partition_index_file_from_topic_dir(
@@ -134,7 +143,54 @@ impl BatchCoordinator for DefaultBatchCoordinator {
 
             match file {
                 Ok(mut file) => {
-                    // TODO: probably logic to determine where in the file things exist?
+                    // let FindBatchRequest { topic_id_partition, offset, max_partition_fetch_bytes } = request;
+
+                    let result = file.seek(std::io::SeekFrom::Start(request.offset)).unwrap();
+
+                    let mut buf: [u8; 28] = [0; Index::packed_size()];
+
+                    file.read_exact(&mut buf).unwrap();
+
+                    let index = Index::try_from(buf.as_ref());
+
+                    match index {
+                        Ok(index) => {
+                            results.push(FindBatchResponse {
+                                errors: vec![],
+                                batches: vec![BatchInfo {
+                                    batch_id: 0,
+                                    object_key: index.object_key.to_string(),
+                                    metadata: BatchMetadata {
+                                        topic_id_partition,
+                                        byte_offset: index.offset,
+                                        byte_size: index.size,
+                                        ..Default::default()
+                                        // base_offset: todo!(),
+                                        // last_offset: todo!(),
+                                        // log_append_timestamp: todo!(),
+                                        // batch_max_timestamp: todo!(),
+                                        // timestamp_type: crate::coordinator::TimestampType::Dummy,
+                                        // producer_id: todo!(),
+                                        // producer_epoch: todo!(),
+                                        // base_sequence: todo!(),
+                                        // last_sequence: todo!(),
+                                    },
+                                }],
+                                log_start_offset: request.offset,
+                                high_watermark: 0,
+                            });
+                        }
+                        Err(err) => {
+                            results.push(FindBatchResponse {
+                                errors: vec![err.to_string()],
+                                batches: vec![],
+                                log_start_offset: request.offset,
+                                high_watermark: 0,
+                            });
+                        }
+                    }
+
+                    // file[result..res];
 
                     // let offset = request.byte_offset;
                     // let size = request.size;
@@ -200,7 +256,7 @@ impl Index {
     }
 
     #[inline]
-    pub fn packed_size() -> usize {
+    pub const fn packed_size() -> usize {
         16 + std::mem::size_of::<u64>() + std::mem::size_of::<u32>()
     }
 
