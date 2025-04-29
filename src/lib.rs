@@ -1,7 +1,9 @@
+#[deny(missing_docs)]
+
 mod broker;
 pub mod simple_batch_coordinator;
-mod batch_coordinator;
-mod messages;
+pub mod batch_coordinator;
+pub mod messages;
 mod segment;
 
 pub use broker::Broker;

@@ -1,5 +1,5 @@
 //! This entire interface is generated directly from the underlying KIP-1164 interface found here: 
-//! https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=350783984#KIP1164:TopicBasedBatchCoordinator-BatchCoordinatorpluggableinterface
+//! <https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=350783984#KIP1164:TopicBasedBatchCoordinator-BatchCoordinatorpluggableinterface>
 
 #![allow(dead_code)]
 

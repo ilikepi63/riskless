@@ -17,18 +17,24 @@ use crate::{
     segment::SharedLogSegment,
 };
 
+/// A Broker is the primary interface through riskless is implemented. Broker's are designed to
+/// be embedded in nodes, have full access (both read and write) to the underlying object storage implementation and
+/// communicate with the configured batch coordinator.
 pub struct Broker {
     config: BrokerConfiguration,
-    // produce_buffer: Vec<ProduceRequest>,
     produce_request_tx: tokio::sync::mpsc::Sender<ProduceRequest>,
 }
 
+/// Configuration for the broker containing required dependencies.
 pub struct BrokerConfiguration {
+    /// The object store implementation used for persisting message batches
     object_store: Arc<dyn ObjectStore>,
+    /// The batch coordinator responsible for assigning offsets to batches
     batch_coordinator: Arc<dyn BatchCoordinator>,
 }
 
 impl Broker {
+    /// Creates a new broker instance with the given configuration.
     pub fn new(config: BrokerConfiguration) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<ProduceRequest>(100);
         let batch_coordinator_ref = config.batch_coordinator.clone();
@@ -104,6 +110,11 @@ impl Broker {
         }
     }
 
+    /// Handles a produce request by buffering the message for later persistence.
+    ///
+    /// The message is added to an in-memory buffer which will be periodically
+    /// flushed to object storage by a background task. The actual persistence
+    /// happens asynchronously.
     pub async fn produce(&mut self, request: ProduceRequest) -> RisklessResult<ProduceResponse> {
         self.produce_request_tx.send(request).await?;
 
@@ -114,6 +125,7 @@ impl Broker {
         // The broker sends responses to all Produce requests that are associated with the committed object.
     }
 
+    /// Handles a consume request by retrieving messages from object storage.
     pub async fn consume(&self, request: ConsumeRequest) -> RisklessResult<ConsumeResponse> {
         let batch_responses = self.config.batch_coordinator.find_batches(
             vec![FindBatchRequest {
