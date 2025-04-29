@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     coordinator::{
-        BatchCoordinator, FindBatchRequest, TopicIdPartition, default_impl::DefaultBatchCoordinator,
+        BatchCoordinator, FindBatchRequest, TopicIdPartition, simple::SimpleBatchCoordinator,
     },
     error::{RisklessError, RisklessResult},
     messages::{
@@ -134,7 +134,6 @@ impl Broker {
             .map(|batch_info| batch_info.object_key)
             .collect::<HashSet<_>>();
 
-
         println!("objects : {:#?}", objects_to_retrieve);
 
         let result = objects_to_retrieve
@@ -176,7 +175,7 @@ impl Broker {
                                     .try_into()
                                     .unwrap();
 
-                                println!("START: {} END: {} ", start, end);
+                                    println!("START: {} END: {} ", start, end);
 
                                     let data = b.slice(start..end);
 
@@ -275,7 +274,7 @@ mod tests {
             object_store: Arc::new(object_store::local::LocalFileSystem::new_with_prefix(
                 object_store_path,
             )?),
-            batch_coordinator: Arc::new(DefaultBatchCoordinator::new(
+            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
                 batch_coord_path.to_string_lossy().to_string(),
             )),
         };
@@ -314,7 +313,7 @@ mod tests {
 
         println!("{:#?}", consume_response);
 
-            panic!();
+        panic!();
 
         Ok(())
     }

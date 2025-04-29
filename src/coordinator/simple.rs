@@ -21,11 +21,11 @@ use super::{
     ListOffsetsResponse,
 };
 
-pub struct DefaultBatchCoordinator {
+pub struct SimpleBatchCoordinator {
     directory: PathBuf,
 }
 
-impl DefaultBatchCoordinator {
+impl SimpleBatchCoordinator {
     pub fn new(directory: String) -> Self {
         Self {
             directory: PathBuf::from(directory),
@@ -82,7 +82,7 @@ impl DefaultBatchCoordinator {
     }
 }
 
-impl BatchCoordinator for DefaultBatchCoordinator {
+impl BatchCoordinator for SimpleBatchCoordinator {
     fn create_topic_and_partitions(&self, requests: HashSet<CreateTopicAndPartitionsRequest>) {
         todo!()
     }

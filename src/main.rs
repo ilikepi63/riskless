@@ -1,6 +1,6 @@
 use std::io::{Read, Seek};
 
-use riskless::coordinator::default_impl::Index;
+use riskless::coordinator::simple::Index;
 
 
 
