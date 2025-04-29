@@ -9,10 +9,8 @@ use bytes::BytesMut;
 use uuid::Uuid;
 
 use crate::{
-    batch_coordinator::BatchInfo,
-    error::RisklessResult,
-    messages::commit_batch_request::CommitBatchRequest,
-    simple_batch_coordinator::index::Index,
+    batch_coordinator::BatchInfo, error::RisklessResult,
+    messages::commit_batch_request::CommitBatchRequest, simple_batch_coordinator::index::Index,
 };
 
 use crate::batch_coordinator::{
@@ -40,7 +38,7 @@ impl SimpleBatchCoordinator {
         let current_topic_dir = match current_topic_dir.exists() {
             true => current_topic_dir,
             false => {
-                std::fs::create_dir(current_topic_dir.clone());
+                let _ = std::fs::create_dir(current_topic_dir.clone()); // TODO: handle this error.
                 current_topic_dir
             }
         };
@@ -83,18 +81,19 @@ impl SimpleBatchCoordinator {
 }
 
 impl BatchCoordinator for SimpleBatchCoordinator {
-    fn create_topic_and_partitions(&self, requests: HashSet<CreateTopicAndPartitionsRequest>) {
-        todo!()
+    fn create_topic_and_partitions(&self, _requests: HashSet<CreateTopicAndPartitionsRequest>) {
+        // This is not implemented for SimpleBatchCoordinator as the topics + partitions get 
+        // created as they have data produced to them.
     }
 
     fn commit_file(
         &self,
         object_key: [u8; 16],
-        uploader_broker_id: u32,
-        file_size: u64,
+        _uploader_broker_id: u32,
+        _file_size: u64,
         batches: Vec<CommitBatchRequest>,
     ) -> Vec<CommitBatchResponse> {
-        let results: Vec<CommitBatchResponse> = vec![];
+        // TODO: this needs to return CommitBatchResponses.
 
         for batch in batches {
             let mut current_topic_dir = self.topic_dir(batch.topic_id_partition.0);
@@ -115,7 +114,7 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
                     let buf: BytesMut = index.into();
 
-                    file.write_all(&buf);
+                    let _ = file.write_all(&buf); // TODO: handle this error.
                 }
                 Err(err) => {
                     println!("Error when creating index file: {:#?}", err);
@@ -130,7 +129,7 @@ impl BatchCoordinator for SimpleBatchCoordinator {
     fn find_batches(
         &self,
         find_batch_requests: Vec<FindBatchRequest>,
-        fetch_max_bytes: u32,
+        _fetch_max_bytes: u32,
     ) -> Vec<FindBatchResponse> {
         let mut results = vec![];
 
@@ -148,11 +147,9 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
             match file {
                 Ok(mut file) => {
-                    // let FindBatchRequest { topic_id_partition, offset, max_partition_fetch_bytes } = request;
-
                     println!("Reading from position: {:#?}", request.offset);
 
-                    let result = file.seek(std::io::SeekFrom::Start(request.offset)).unwrap();
+                    let _result = file.seek(std::io::SeekFrom::Start(request.offset)).unwrap();
 
                     let mut buf: [u8; 28] = [0; Index::packed_size()];
 
@@ -208,15 +205,15 @@ impl BatchCoordinator for SimpleBatchCoordinator {
         results
     }
 
-    fn list_offsets(&self, requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse> {
+    fn list_offsets(&self, _requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse> {
         todo!()
     }
 
-    fn delete_records(&self, requests: Vec<DeleteRecordsRequest>) -> Vec<DeleteRecordsResponse> {
+    fn delete_records(&self, _requests: Vec<DeleteRecordsRequest>) -> Vec<DeleteRecordsResponse> {
         todo!()
     }
 
-    fn delete_topics(&self, topic_ids: HashSet<uuid::Uuid>) {
+    fn delete_topics(&self, _topic_ids: HashSet<uuid::Uuid>) {
         todo!()
     }
 
@@ -224,11 +221,11 @@ impl BatchCoordinator for SimpleBatchCoordinator {
         todo!()
     }
 
-    fn delete_files(&self, request: DeleteFilesRequest) {
+    fn delete_files(&self, _request: DeleteFilesRequest) {
         todo!()
     }
 
-    fn is_safe_to_delete_file(&self, object_key: String) -> bool {
+    fn is_safe_to_delete_file(&self, _object_key: String) -> bool {
         todo!()
     }
 }
@@ -238,9 +235,8 @@ mod tests {
     use crate::batch_coordinator::TopicIdPartition;
 
     use super::*;
-    use std::collections::HashSet;
     use std::fs::{self, File};
-    use std::io::{Read, Seek, SeekFrom, Write};
+    use std::io::Read;
     use tempdir::TempDir;
     use uuid::Uuid;
 
@@ -413,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_find_batches_reads_correct_data() {
-        let (coordinator, temp_dir) = create_test_coordinator();
+        let (coordinator, _) = create_test_coordinator();
         let topic = "test_topic".to_string();
         let partition = 1;
 
@@ -461,6 +457,7 @@ mod tests {
 
     // #[test]
     // Not Implemented yet.
+    #[allow(dead_code)]
     fn test_find_batches_handles_missing_file() {
         let (coordinator, _) = create_test_coordinator();
 

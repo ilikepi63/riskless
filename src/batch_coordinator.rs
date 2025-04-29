@@ -1,3 +1,8 @@
+//! This entire interface is generated directly from the underlying KIP-1164 interface found here: 
+//! https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=350783984#KIP1164:TopicBasedBatchCoordinator-BatchCoordinatorpluggableinterface
+
+#![allow(dead_code)]
+
 use std::collections::HashSet;
 use std::vec::Vec;
 
@@ -16,19 +21,19 @@ pub enum TimestampType {
 
 #[derive(Debug)]
 pub struct CreateTopicAndPartitionsRequest {
-    topic_id: uuid::Uuid,
-    topic_name: String,
-    num_partitions: u32,
+    pub topic_id: uuid::Uuid,
+    pub topic_name: String,
+    pub num_partitions: u32,
 }
 
 #[derive(Debug)]
 pub struct CommitBatchResponse {
-    errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
-    assigned_base_offset: u64,
-    log_append_time: u64,
-    log_start_offset: u64,
-    is_duplicate: bool,
-    request: CommitBatchRequest,
+    pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    pub assigned_base_offset: u64,
+    pub log_append_time: u64,
+    pub log_start_offset: u64,
+    pub is_duplicate: bool,
+    pub request: CommitBatchRequest,
 }
 
 #[derive(Debug)]
@@ -71,8 +76,8 @@ pub struct BatchMetadata {
 
 #[derive(Debug)]
 pub struct ListOffsetsRequest {
-    topic_id_partition: TopicIdPartition,
-    timestamp: u64,
+    pub topic_id_partition: TopicIdPartition,
+    pub timestamp: u64,
 }
 
 // impl ListOffsetsRequest {

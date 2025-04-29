@@ -5,14 +5,16 @@ use object_store::{ObjectStore, PutPayload, path::Path};
 use tokio::sync::RwLock;
 
 use crate::{
-
-    batch_coordinator::{BatchCoordinator, FindBatchRequest, TopicIdPartition}, error::RisklessResult, messages::{
+    batch_coordinator::{BatchCoordinator, FindBatchRequest, TopicIdPartition},
+    error::RisklessResult,
+    messages::{
         commit_batch_request::CommitBatchRequest,
         consume_request::ConsumeRequest,
         consume_response::{ConsumeBatch, ConsumeResponse},
         produce_request::{ProduceRequest, ProduceRequestCollection},
         produce_response::ProduceResponse,
-    }, segment::SharedLogSegment
+    },
+    segment::SharedLogSegment,
 };
 
 pub struct Broker {
@@ -192,7 +194,8 @@ impl Broker {
                             vec![]
                         }
                     }
-                    Err(err) => {
+                    Err(_err) => {
+                        // TODO: How are we going to handle errors here?
                         vec![]
                     }
                 };
@@ -235,9 +238,11 @@ async fn flush_buffer(
 
     let path_string = Path::from(path.to_string());
 
-    let put_result = object_storage
+    let _put_result = object_storage
         .put(&path_string, PutPayload::from_bytes(buf))
         .await?;
+
+    // TODO: assert put_result has the correct response?
 
     // TODO: The responses here?
     batch_coordinator.commit_file(
@@ -279,13 +284,15 @@ mod tests {
 
         let mut broker = Broker::new(config);
 
-        let result = broker
+        let _result = broker
             .produce(ProduceRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "hello".as_bytes().to_vec(),
             })
             .await?;
+
+        // TODO: Assert result has the correct data.
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 

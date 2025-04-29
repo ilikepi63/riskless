@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::batch_coordinator::{TimestampType, TopicIdPartition};
 
 use super::batch_coordinate::BatchCoordinate;
@@ -19,7 +21,6 @@ pub struct CommitBatchRequest {
 }
 
 impl From<&BatchCoordinate> for CommitBatchRequest {
-
     fn from(value: &BatchCoordinate) -> Self {
         // Everything that is defaulted is unknown for now.
         CommitBatchRequest {
