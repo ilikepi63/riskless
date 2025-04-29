@@ -1,5 +1,5 @@
 mod broker;
-mod coordinator;
+pub mod coordinator;
 mod messages;
 mod segment;
 

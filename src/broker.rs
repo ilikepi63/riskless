@@ -1,16 +1,18 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use bytes::Bytes;
-use object_store::{ObjectStore, PutPayload, path::Path};
+use object_store::{GetResult, ObjectStore, PutPayload, path::Path};
 use tokio::sync::RwLock;
 
 use crate::{
-    coordinator::{BatchCoordinator, default_impl::DefaultBatchCoordinator},
-    error::RisklessResult,
+    coordinator::{
+        BatchCoordinator, FindBatchRequest, TopicIdPartition, default_impl::DefaultBatchCoordinator,
+    },
+    error::{RisklessError, RisklessResult},
     messages::{
         commit_batch_request::CommitBatchRequest,
         consume_request::ConsumeRequest,
-        consume_response::ConsumeResponse,
+        consume_response::{self, ConsumeBatch, ConsumeResponse},
         produce_request::{ProduceRequest, ProduceRequestCollection},
         produce_response::ProduceResponse,
     },
@@ -115,16 +117,109 @@ impl Broker {
     }
 
     pub async fn consume(&self, request: ConsumeRequest) -> RisklessResult<ConsumeResponse> {
+        let batch_responses = self.config.batch_coordinator.find_batches(
+            vec![FindBatchRequest {
+                topic_id_partition: TopicIdPartition(request.topic, request.partition),
+                offset: request.offset,
+                max_partition_fetch_bytes: 0,
+            }],
+            0,
+        );
 
-        
+        println!("BATCH RESPONSES: {:#?}", batch_responses);
 
-        // The consumer sends a Fetch request to the broker.
-        // The broker queries the Batch Coordinator for the relevant batch coordinates.
-        // The broker gets the data either from the object storage and/or from the cache.
-        // The broker injects the computed offsets and timestamps into the batches.
-        // The broker constructs and sends the Fetch response to the Consumer.
+        let objects_to_retrieve = batch_responses
+            .iter()
+            .flat_map(|resp| resp.batches.clone())
+            .map(|batch_info| batch_info.object_key)
+            .collect::<HashSet<_>>();
 
-        todo!();
+
+        println!("objects : {:#?}", objects_to_retrieve);
+
+        let result = objects_to_retrieve
+            .iter()
+            .map(|object_name| async {
+                let get_object_result = self
+                    .config
+                    .object_store
+                    .get(&Path::from(object_name.as_str()))
+                    .await;
+
+                println!("GET OBJECT RESULT{:#?}", get_object_result);
+
+                let result = match get_object_result {
+                    Ok(get_result) => {
+                        if let Ok(b) = get_result.bytes().await {
+                            println!("Retrieved Bytes: {:#?}", b);
+
+                            // Retrieve the current fetch Responses by name.
+                            let batch_responses_for_object = batch_responses
+                                .iter()
+                                .flat_map(|res| {
+                                    res.batches
+                                        .iter()
+                                        .filter(|batch| batch.object_key == *object_name)
+                                        .map(|batch| (res.clone(), batch))
+                                })
+                                .map(|(res, batch)| {
+                                    println!("HELLO");
+
+                                    // index into the bytes.
+                                    let start: usize = (batch.metadata.base_offset
+                                        + batch.metadata.byte_offset)
+                                        .try_into()
+                                        .unwrap();
+                                    let end: usize = (batch.metadata.base_offset
+                                        + batch.metadata.byte_offset
+                                        + Into::<u64>::into(batch.metadata.byte_size))
+                                    .try_into()
+                                    .unwrap();
+
+                                println!("START: {} END: {} ", start, end);
+
+                                    let data = b.slice(start..end);
+
+                                    let batch = ConsumeBatch {
+                                        topic: batch.metadata.topic_id_partition.0.clone(),
+                                        partition: batch.metadata.topic_id_partition.1,
+                                        offset: res.log_start_offset,
+                                        max_partition_fetch_bytes: 0,
+                                        data,
+                                    };
+
+                                    Some(batch)
+                                })
+                                .collect::<Vec<_>>();
+
+                            batch_responses_for_object
+                        } else {
+                            vec![]
+                        }
+                    }
+                    Err(err) => {
+                        vec![]
+                    }
+                };
+                result
+            })
+            .collect::<Vec<_>>();
+
+        let mut consume_response = ConsumeResponse { batches: vec![] };
+
+        futures::future::join_all(result)
+            .await
+            .iter()
+            .for_each(|res| {
+                res.iter().for_each(|batch| match batch {
+                    Some(b) => {
+                        consume_response.batches.push(b.clone());
+                    }
+                    None => {}
+                })
+            });
+
+        Ok(consume_response)
     }
 }
 
@@ -145,13 +240,9 @@ async fn flush_buffer(
 
     let path_string = Path::from(path.to_string());
 
-    println!("Putting the Result!");
-
     let put_result = object_storage
         .put(&path_string, PutPayload::from_bytes(buf))
         .await?;
-
-    println!("Result from putting: {:#?}", put_result);
 
     // TODO: The responses here?
     batch_coordinator.commit_file(
@@ -199,9 +290,31 @@ mod tests {
             })
             .await?;
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // TODO: assertions
+        let consume_response = broker
+            .consume(ConsumeRequest {
+                topic: "example-topic".to_string(),
+                partition: 1,
+                offset: 0,
+                max_partition_fetch_bytes: 0,
+            })
+            .await;
+
+        println!("{:#?}", consume_response);
+
+        let consume_response = broker
+            .consume(ConsumeRequest {
+                topic: "example-topic".to_string(),
+                partition: 1,
+                offset: 1,
+                max_partition_fetch_bytes: 0,
+            })
+            .await;
+
+        println!("{:#?}", consume_response);
+
+            panic!();
 
         Ok(())
     }

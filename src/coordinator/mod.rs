@@ -11,7 +11,7 @@ pub mod default_impl;
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
 pub struct TopicIdPartition(pub String, pub u64);
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub enum TimestampType {
     #[default]
     Dummy,
@@ -41,7 +41,7 @@ pub struct FindBatchRequest {
     pub max_partition_fetch_bytes: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FindBatchResponse {
     pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
     pub batches: Vec<BatchInfo>,
@@ -49,14 +49,14 @@ pub struct FindBatchResponse {
     pub high_watermark: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BatchInfo {
     pub batch_id: u64,
     pub object_key: String,
     pub metadata: BatchMetadata,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct BatchMetadata {
     pub topic_id_partition: TopicIdPartition,
     pub byte_offset: u64,

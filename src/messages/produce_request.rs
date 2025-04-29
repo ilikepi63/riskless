@@ -2,7 +2,7 @@ use std::collections::{hash_map::{Entry, Values}, HashMap};
 
 use crate::{coordinator::TopicIdPartition, error::RisklessResult};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ProduceRequest {
     pub topic: String,
     pub partition: u64,

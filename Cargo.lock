@@ -638,6 +638,7 @@ name = "riskless"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "futures",
  "object_store",
  "thiserror",
  "tokio",

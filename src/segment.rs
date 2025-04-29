@@ -27,6 +27,7 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
         for partition in value.iter_partitions() {
             for req in partition {
                 let offset: u64 = (buf.len()).try_into()?;
+                let size = req.data.len();
 
                 buf.put_slice(&req.data);
 
@@ -37,6 +38,7 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
                     partition: req.partition,
                     base_offset,
                     offset,
+                    size: size.try_into()?
                 });
             }
         }

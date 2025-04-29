@@ -29,7 +29,7 @@ impl From<&BatchCoordinate> for CommitBatchRequest {
             request_id: 1, // TODO: have a generator for this.
             topic_id_partition: TopicIdPartition(value.topic.clone(), value.partition),
             byte_offset: value.offset,
-            size: Default::default(),
+            size: value.size,
             base_offset: value.base_offset,
             last_offset: Default::default(),
             batch_max_timestamp: Default::default(),

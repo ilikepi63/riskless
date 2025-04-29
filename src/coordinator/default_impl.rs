@@ -74,6 +74,12 @@ impl DefaultBatchCoordinator {
 
         Ok(file)
     }
+
+    fn open_file(current_partition_file: &PathBuf) -> RisklessResult<File> {
+        let file = std::fs::File::open(current_partition_file)?;
+
+        Ok(file)
+    }
 }
 
 impl BatchCoordinator for DefaultBatchCoordinator {
@@ -129,8 +135,7 @@ impl BatchCoordinator for DefaultBatchCoordinator {
         let mut results = vec![];
 
         for request in find_batch_requests {
-
-            let topic_id_partition = request.topic_id_partition.clone() ;
+            let topic_id_partition = request.topic_id_partition.clone();
 
             let mut current_topic_dir = self.topic_dir(request.topic_id_partition.0);
 
@@ -139,11 +144,13 @@ impl BatchCoordinator for DefaultBatchCoordinator {
                 request.topic_id_partition.1,
             );
 
-            let file = Self::open_or_create_file(current_partition_file);
+            let file = Self::open_file(current_partition_file);
 
             match file {
                 Ok(mut file) => {
                     // let FindBatchRequest { topic_id_partition, offset, max_partition_fetch_bytes } = request;
+
+                    println!("Reading from position: {:#?}", request.offset);
 
                     let result = file.seek(std::io::SeekFrom::Start(request.offset)).unwrap();
 
@@ -155,6 +162,8 @@ impl BatchCoordinator for DefaultBatchCoordinator {
 
                     match index {
                         Ok(index) => {
+                            println!("Received Index: {:#?}", index);
+
                             results.push(FindBatchResponse {
                                 errors: vec![],
                                 batches: vec![BatchInfo {
@@ -164,16 +173,15 @@ impl BatchCoordinator for DefaultBatchCoordinator {
                                         topic_id_partition,
                                         byte_offset: index.offset,
                                         byte_size: index.size,
-                                        ..Default::default()
-                                        // base_offset: todo!(),
-                                        // last_offset: todo!(),
-                                        // log_append_timestamp: todo!(),
-                                        // batch_max_timestamp: todo!(),
-                                        // timestamp_type: crate::coordinator::TimestampType::Dummy,
-                                        // producer_id: todo!(),
-                                        // producer_epoch: todo!(),
-                                        // base_sequence: todo!(),
-                                        // last_sequence: todo!(),
+                                        ..Default::default() // base_offset: todo!(),
+                                                             // last_offset: todo!(),
+                                                             // log_append_timestamp: todo!(),
+                                                             // batch_max_timestamp: todo!(),
+                                                             // timestamp_type: crate::coordinator::TimestampType::Dummy,
+                                                             // producer_id: todo!(),
+                                                             // producer_epoch: todo!(),
+                                                             // base_sequence: todo!(),
+                                                             // last_sequence: todo!(),
                                     },
                                 }],
                                 log_start_offset: request.offset,
@@ -211,7 +219,7 @@ impl BatchCoordinator for DefaultBatchCoordinator {
             }
         }
 
-        vec![]
+        results
     }
 
     fn list_offsets(&self, requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse> {
