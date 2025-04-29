@@ -3,7 +3,7 @@ name = "riskless"
 version = "0.1.1"
 edition = "2024"
 description = "A pure Rust implementation of Diskless Topics"
-license = "Apache-2.0"
+license = "MIT / Apache-2.0"
 repository = "https://github.com/ilikepi63/riskless"
 
 [dependencies]
