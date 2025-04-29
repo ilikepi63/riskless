@@ -1,6 +1,5 @@
 use crate::{
-    coordinator::{TimestampType, TopicIdPartition},
-    error::RisklessError,
+    batch_coordinator::{TimestampType, TopicIdPartition}, error::RisklessError
 };
 
 use super::batch_coordinate::BatchCoordinate;

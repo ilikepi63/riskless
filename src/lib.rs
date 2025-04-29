@@ -1,5 +1,6 @@
 mod broker;
-pub mod coordinator;
+pub mod simple_batch_coordinator;
+mod batch_coordinator;
 mod messages;
 mod segment;
 

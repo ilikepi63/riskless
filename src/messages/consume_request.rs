@@ -1,4 +1,4 @@
-use crate::{coordinator::{FindBatchRequest, TopicIdPartition}, error::RisklessError};
+use crate::{ batch_coordinator::{FindBatchRequest, TopicIdPartition}, error::RisklessError};
 
 #[derive(Debug)]
 pub struct ConsumeRequest {

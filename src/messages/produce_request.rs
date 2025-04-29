@@ -1,6 +1,9 @@
-use std::collections::{hash_map::{Entry, Values}, HashMap};
+use std::collections::{
+    HashMap,
+    hash_map::{Entry, Values},
+};
 
-use crate::{coordinator::TopicIdPartition, error::RisklessResult};
+use crate::{batch_coordinator::TopicIdPartition, error::RisklessResult};
 
 #[derive(Debug, Clone)]
 pub struct ProduceRequest {
@@ -19,7 +22,7 @@ impl ProduceRequestCollection {
     pub fn new() -> Self {
         Self {
             inner: HashMap::new(),
-            size: 0
+            size: 0,
         }
     }
 
@@ -51,7 +54,7 @@ impl ProduceRequestCollection {
         self.size
     }
 
-    pub fn iter_partitions<'a>(&'a mut self) -> Values<'a, TopicIdPartition, Vec<ProduceRequest> > {
+    pub fn iter_partitions<'a>(&'a mut self) -> Values<'a, TopicIdPartition, Vec<ProduceRequest>> {
         self.inner.values()
     }
 }

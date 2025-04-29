@@ -6,8 +6,6 @@ use std::time::SystemTime;
 
 use crate::messages::commit_batch_request::CommitBatchRequest;
 
-pub mod simple;
-
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
 pub struct TopicIdPartition(pub String, pub u64);
 

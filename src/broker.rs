@@ -5,18 +5,14 @@ use object_store::{GetResult, ObjectStore, PutPayload, path::Path};
 use tokio::sync::RwLock;
 
 use crate::{
-    coordinator::{
-        BatchCoordinator, FindBatchRequest, TopicIdPartition, simple::SimpleBatchCoordinator,
-    },
-    error::{RisklessError, RisklessResult},
-    messages::{
+
+    batch_coordinator::{BatchCoordinator, FindBatchRequest, TopicIdPartition}, error::{RisklessError, RisklessResult}, messages::{
         commit_batch_request::CommitBatchRequest,
         consume_request::ConsumeRequest,
         consume_response::{self, ConsumeBatch, ConsumeResponse},
         produce_request::{ProduceRequest, ProduceRequestCollection},
         produce_response::ProduceResponse,
-    },
-    segment::SharedLogSegment,
+    }, segment::SharedLogSegment
 };
 
 pub struct Broker {
@@ -259,6 +255,8 @@ async fn flush_buffer(
 
 #[cfg(test)]
 mod tests {
+    use crate::simple_batch_coordinator::SimpleBatchCoordinator;
+
     use super::*;
 
     #[tokio::test]
@@ -302,18 +300,11 @@ mod tests {
 
         println!("{:#?}", consume_response);
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
-                topic: "example-topic".to_string(),
-                partition: 1,
-                offset: 1,
-                max_partition_fetch_bytes: 0,
-            })
-            .await;
+        assert!(consume_response.is_ok());
 
-        println!("{:#?}", consume_response);
+        let resp = consume_response.unwrap();
 
-        panic!();
+        assert_eq!(resp.batches.len(), 1);
 
         Ok(())
     }
