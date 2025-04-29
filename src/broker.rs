@@ -1,15 +1,15 @@
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use bytes::Bytes;
-use object_store::{GetResult, ObjectStore, PutPayload, path::Path};
+use object_store::{ObjectStore, PutPayload, path::Path};
 use tokio::sync::RwLock;
 
 use crate::{
 
-    batch_coordinator::{BatchCoordinator, FindBatchRequest, TopicIdPartition}, error::{RisklessError, RisklessResult}, messages::{
+    batch_coordinator::{BatchCoordinator, FindBatchRequest, TopicIdPartition}, error::RisklessResult, messages::{
         commit_batch_request::CommitBatchRequest,
         consume_request::ConsumeRequest,
-        consume_response::{self, ConsumeBatch, ConsumeResponse},
+        consume_response::{ConsumeBatch, ConsumeResponse},
         produce_request::{ProduceRequest, ProduceRequestCollection},
         produce_response::ProduceResponse,
     }, segment::SharedLogSegment

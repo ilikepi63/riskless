@@ -1,6 +1,4 @@
-use crate::{
-    batch_coordinator::{TimestampType, TopicIdPartition}, error::RisklessError
-};
+use crate::batch_coordinator::{TimestampType, TopicIdPartition};
 
 use super::batch_coordinate::BatchCoordinate;
 

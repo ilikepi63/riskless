@@ -1,12 +1,11 @@
-use std::ops::Index;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 
 use crate::{
     error::RisklessError,
     messages::{
         batch_coordinate::BatchCoordinate,
-        produce_request::{ProduceRequest, ProduceRequestCollection},
+        produce_request::ProduceRequestCollection,
     },
 };
 
@@ -61,6 +60,8 @@ impl Into<bytes::Bytes> for SharedLogSegment {
 
 #[cfg(test)]
 mod tests {
+    use crate::messages::produce_request::ProduceRequest;
+
     use super::*;
     use std::convert::TryFrom;
 

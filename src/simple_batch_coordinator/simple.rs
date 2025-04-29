@@ -1,17 +1,16 @@
 use std::{
     collections::HashSet,
-    fs::{self, File, OpenOptions},
+    fs::{File, OpenOptions},
     io::{Read, Seek, Write},
-    path::{Path, PathBuf},
-    thread::current,
+    path::PathBuf,
 };
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::BytesMut;
 use uuid::Uuid;
 
 use crate::{
     batch_coordinator::BatchInfo,
-    error::{RisklessError, RisklessResult},
+    error::RisklessResult,
     messages::commit_batch_request::CommitBatchRequest,
     simple_batch_coordinator::index::Index,
 };
@@ -95,7 +94,7 @@ impl BatchCoordinator for SimpleBatchCoordinator {
         file_size: u64,
         batches: Vec<CommitBatchRequest>,
     ) -> Vec<CommitBatchResponse> {
-        let mut results: Vec<CommitBatchResponse> = vec![];
+        let results: Vec<CommitBatchResponse> = vec![];
 
         for batch in batches {
             let mut current_topic_dir = self.topic_dir(batch.topic_id_partition.0);
@@ -114,7 +113,7 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
                     let index = Index::new(Uuid::from_bytes(object_key), offset, size);
 
-                    let mut buf: BytesMut = index.into();
+                    let buf: BytesMut = index.into();
 
                     file.write_all(&buf);
                 }
