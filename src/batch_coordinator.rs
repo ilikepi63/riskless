@@ -1,4 +1,4 @@
-//! This entire interface is generated directly from the underlying KIP-1164 interface found here: 
+//! This entire interface is generated directly from the underlying KIP-1164 interface found here:
 //! <https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=350783984#KIP1164:TopicBasedBatchCoordinator-BatchCoordinatorpluggableinterface>
 
 #![allow(dead_code)]
@@ -148,9 +148,11 @@ pub struct FileToDelete {
 pub struct DeleteFilesRequest {
     object_key_paths: HashSet<String>,
 }
+
+#[async_trait::async_trait]
 pub trait BatchCoordinator
 where
-    Self: Send + Sync,
+    Self: Send + Sync + std::fmt::Debug,
 {
     /// This operation is called when a Diskless partition
     /// (or a topic with one or more partitions) is created in the cluster.
@@ -158,7 +160,7 @@ where
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    fn create_topic_and_partitions(&self, requests: HashSet<CreateTopicAndPartitionsRequest>);
+    async fn create_topic_and_partitions(&self, requests: HashSet<CreateTopicAndPartitionsRequest>);
 
     /// This operation is called by a broker after uploading the
     /// shared log segment object to the object storage.
@@ -172,7 +174,7 @@ where
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    fn commit_file(
+    async fn commit_file(
         &self,
         object_key: [u8; 16],
         uploader_broker_id: u32,
@@ -186,7 +188,7 @@ where
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    fn find_batches(
+    async fn find_batches(
         &self,
         find_batch_requests: Vec<FindBatchRequest>,
         fetch_max_bytes: u32,
@@ -197,7 +199,7 @@ where
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    fn list_offsets(&self, requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse>;
+    async fn list_offsets(&self, requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse>;
 
     /// This operation is called when a partition needs to be truncated by the user.
     /// The Batch Coordinator:
@@ -208,7 +210,10 @@ where
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    fn delete_records(&self, requests: Vec<DeleteRecordsRequest>) -> Vec<DeleteRecordsResponse>;
+    async fn delete_records(
+        &self,
+        requests: Vec<DeleteRecordsRequest>,
+    ) -> Vec<DeleteRecordsResponse>;
 
     /// This operation is called when topics are deleted.
     /// It’s similar to deleting records, but all the associated batches
@@ -216,14 +221,14 @@ where
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    fn delete_topics(&self, topic_ids: HashSet<uuid::Uuid>);
+    async fn delete_topics(&self, topic_ids: HashSet<uuid::Uuid>);
 
     /// This operation allows a broker to get a list of soft deleted objects
     /// for asynchronous physical deletion from the object storage.
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    fn get_files_to_delete(&self) -> Vec<FileToDelete>;
+    async fn get_files_to_delete(&self) -> Vec<FileToDelete>;
 
     /// This operation informs the Batch Coordinator that certain soft deleted
     /// objects were also deleted physically from the object storage.
@@ -231,7 +236,7 @@ where
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    fn delete_files(&self, request: DeleteFilesRequest);
+    async fn delete_files(&self, request: DeleteFilesRequest);
 
-    fn is_safe_to_delete_file(&self, object_key: String) -> bool;
+    async fn is_safe_to_delete_file(&self, object_key: String) -> bool;
 }

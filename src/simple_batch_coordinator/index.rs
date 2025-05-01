@@ -40,11 +40,11 @@ impl TryFrom<&[u8]> for Index {
             return Err(RisklessError::Unknown); // TODO make an error for this.; 
         }
 
-        println!("{:#?}", &value[0..16]);
+        tracing::info!("{:#?}", &value[0..16]);
 
         let object_key = Uuid::from_slice(&value[0..16])?;
 
-        println!("{:#?}", &value[17..24]);
+        tracing::info!("{:#?}", &value[17..24]);
 
         let offset = u64::from_be_bytes(value[16..24].try_into()?);
 
@@ -58,11 +58,11 @@ impl TryFrom<&[u8]> for Index {
     }
 }
 
-impl Into<BytesMut> for Index {
-    fn into(self) -> BytesMut {
-        let mut bytes = BytesMut::with_capacity(Self::packed_size());
+impl From<Index> for BytesMut {
+    fn from(val: Index) -> Self {
+        let mut bytes = BytesMut::with_capacity(Index::packed_size());
 
-        self.write(&mut bytes);
+        val.write(&mut bytes);
 
         bytes
     }
@@ -115,7 +115,7 @@ mod tests {
         bytes.extend_from_slice(&offset.to_be_bytes());
         bytes.extend_from_slice(&size.to_be_bytes());
 
-        println!("{:#?}", bytes);
+        tracing::info!("{:#?}", bytes);
 
         let index = Index::try_from(bytes.as_slice()).unwrap();
 
@@ -130,7 +130,7 @@ mod tests {
 
         let result = Index::try_from(bytes.as_slice());
 
-        println!("{:#?}", result);
+        tracing::info!("{:#?}", result);
 
         assert!(result.is_err());
     }

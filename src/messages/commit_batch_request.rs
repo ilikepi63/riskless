@@ -4,7 +4,7 @@ use crate::batch_coordinator::{TimestampType, TopicIdPartition};
 
 use super::batch_coordinate::BatchCoordinate;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommitBatchRequest {
     pub request_id: u32,
     pub topic_id_partition: TopicIdPartition,

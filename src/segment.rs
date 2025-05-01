@@ -1,12 +1,8 @@
-
 use bytes::{BufMut, BytesMut};
 
 use crate::{
     error::RisklessError,
-    messages::{
-        batch_coordinate::BatchCoordinate,
-        produce_request::ProduceRequestCollection,
-    },
+    messages::{batch_coordinate::BatchCoordinate, produce_request::ProduceRequestCollection},
 };
 
 pub struct SharedLogSegment(Vec<BatchCoordinate>, BytesMut);
@@ -30,14 +26,14 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
 
                 buf.put_slice(&req.data);
 
-                println!("{}", buf.len());
+                tracing::info!("{}", buf.len());
 
                 batch_coords.push(BatchCoordinate {
                     topic: req.topic.clone(),
                     partition: req.partition,
                     base_offset,
                     offset,
-                    size: size.try_into()?
+                    size: size.try_into()?,
                 });
             }
         }
@@ -46,15 +42,15 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
     }
 }
 
-impl SharedLogSegment{
+impl SharedLogSegment {
     pub fn get_batch_coords(&self) -> Vec<BatchCoordinate> {
         self.0.clone()
     }
 }
 
-impl Into<bytes::Bytes> for SharedLogSegment {
-    fn into(self) -> bytes::Bytes {
-        self.1.into()
+impl From<SharedLogSegment> for bytes::Bytes {
+    fn from(val: SharedLogSegment) -> Self {
+        val.1.into()
     }
 }
 
@@ -78,11 +74,18 @@ mod tests {
     #[test]
     fn test_single_partition_single_request() -> Result<(), Box<dyn std::error::Error>> {
         let mut collection = ProduceRequestCollection::new();
-        collection.collect(ProduceRequest {
-            topic: "test".to_string(),
-            partition: 0,
-            data: vec![1, 2, 3].into(),
-        })?;
+
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+
+        collection.collect((
+            ProduceRequest {
+                request_id: 1,
+                topic: "test".to_string(),
+                partition: 0,
+                data: vec![1, 2, 3],
+            },
+            tx,
+        ))?;
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());
@@ -105,23 +108,44 @@ mod tests {
     #[test]
     fn test_multiple_partitions_multiple_requests() -> Result<(), Box<dyn std::error::Error>> {
         let mut collection = ProduceRequestCollection::new();
+
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+
         // Partition 0
-        collection.collect(ProduceRequest {
-            topic: "test".to_string(),
-            partition: 0,
-            data: vec![1, 2, 3].into(),
-        })?;
-        collection.collect(ProduceRequest {
-            topic: "test".to_string(),
-            partition: 0,
-            data: vec![4, 5].into(),
-        })?;
+        collection.collect((
+            ProduceRequest {
+                request_id: 1,
+                topic: "test".to_string(),
+                partition: 0,
+                data: vec![1, 2, 3],
+            },
+            tx,
+        ))?;
+
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+
+        collection.collect((
+            ProduceRequest {
+                request_id: 2,
+                topic: "test".to_string(),
+                partition: 0,
+                data: vec![4, 5],
+            },
+            tx,
+        ))?;
+
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+
         // Partition 1
-        collection.collect(ProduceRequest {
-            topic: "test".to_string(),
-            partition: 1,
-            data: vec![6, 7, 8, 9].into(),
-        })?;
+        collection.collect((
+            ProduceRequest {
+                request_id: 3,
+                topic: "test".to_string(),
+                partition: 1,
+                data: vec![6, 7, 8, 9],
+            },
+            tx,
+        ))?;
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());
@@ -154,11 +178,18 @@ mod tests {
     fn test_large_data_offsets() -> Result<(), Box<dyn std::error::Error>> {
         let mut collection = ProduceRequestCollection::new();
         let large_data = vec![0; 10000];
-        collection.collect(ProduceRequest {
-            topic: "large".to_string(),
-            partition: 0,
-            data: large_data.clone().into(),
-        })?;
+
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+
+        collection.collect((
+            ProduceRequest {
+                request_id: 1,
+                topic: "large".to_string(),
+                partition: 0,
+                data: large_data.clone(),
+            },
+            tx,
+        ))?;
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());

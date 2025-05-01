@@ -27,18 +27,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     // file.read_to_end(&mut bytes);
 
 
-    // println!("file contents: {:#?}", bytes);
+    // tracing::info!("file contents: {:#?}", bytes);
 
 
 
 
     // let index = Index::try_from(&bytes[0..28])?;
 
-    // println!("{:#?}", index);
+    // tracing::info!("{:#?}", index);
 
     // let index = Index::try_from(&bytes[28..56])?;
 
-    // println!("{:#?}", index);
+    // tracing::info!("{:#?}", index);
 
     // Ok(())
 }

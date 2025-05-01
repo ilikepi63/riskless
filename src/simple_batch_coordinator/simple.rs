@@ -19,6 +19,7 @@ use crate::batch_coordinator::{
     FindBatchRequest, FindBatchResponse, ListOffsetsRequest, ListOffsetsResponse,
 };
 
+#[derive(Debug)]
 pub struct SimpleBatchCoordinator {
     directory: PathBuf,
 }
@@ -35,15 +36,15 @@ impl SimpleBatchCoordinator {
         let mut current_topic_dir = self.directory.clone();
         current_topic_dir.push(topic);
 
-        let current_topic_dir = match current_topic_dir.exists() {
+        
+
+        match current_topic_dir.exists() {
             true => current_topic_dir,
             false => {
                 let _ = std::fs::create_dir(current_topic_dir.clone()); // TODO: handle this error.
                 current_topic_dir
             }
-        };
-
-        current_topic_dir
+        }
     }
 
     fn partition_index_file_from_topic_dir(
@@ -52,9 +53,9 @@ impl SimpleBatchCoordinator {
     ) -> &mut PathBuf {
         topic_dir.push(format!("{:0>20}.index", partition.to_string()));
 
-        let current_partition_file = topic_dir;
+        
 
-        current_partition_file
+        (topic_dir) as _
     }
 
     // I think you might be able to do this with the File API?
@@ -80,13 +81,17 @@ impl SimpleBatchCoordinator {
     }
 }
 
+#[async_trait::async_trait]
 impl BatchCoordinator for SimpleBatchCoordinator {
-    fn create_topic_and_partitions(&self, _requests: HashSet<CreateTopicAndPartitionsRequest>) {
-        // This is not implemented for SimpleBatchCoordinator as the topics + partitions get 
+    async fn create_topic_and_partitions(
+        &self,
+        _requests: HashSet<CreateTopicAndPartitionsRequest>,
+    ) {
+        // This is not implemented for SimpleBatchCoordinator as the topics + partitions get
         // created as they have data produced to them.
     }
 
-    fn commit_file(
+    async fn commit_file(
         &self,
         object_key: [u8; 16],
         _uploader_broker_id: u32,
@@ -95,8 +100,10 @@ impl BatchCoordinator for SimpleBatchCoordinator {
     ) -> Vec<CommitBatchResponse> {
         // TODO: this needs to return CommitBatchResponses.
 
+        let mut commit_batch_responses = Vec::with_capacity(batches.len());
+
         for batch in batches {
-            let mut current_topic_dir = self.topic_dir(batch.topic_id_partition.0);
+            let mut current_topic_dir = self.topic_dir(batch.topic_id_partition.0.clone());
 
             let current_partition_file = Self::partition_index_file_from_topic_dir(
                 &mut current_topic_dir,
@@ -115,18 +122,34 @@ impl BatchCoordinator for SimpleBatchCoordinator {
                     let buf: BytesMut = index.into();
 
                     let _ = file.write_all(&buf); // TODO: handle this error.
+                    commit_batch_responses.push(CommitBatchResponse {
+                        errors: vec![],
+                        assigned_base_offset: 0,
+                        log_append_time: 0,
+                        log_start_offset: 0,
+                        is_duplicate: false,
+                        request: batch,
+                    });
                 }
                 Err(err) => {
-                    println!("Error when creating index file: {:#?}", err);
+                    commit_batch_responses.push(CommitBatchResponse {
+                        errors: vec![err.to_string()],
+                        assigned_base_offset: 0,
+                        log_append_time: 0,
+                        log_start_offset: 0,
+                        is_duplicate: false,
+                        request: batch,
+                    });
+                    tracing::info!("Error when creating index file: {:#?}", err);
                     // TODO: File error and return to result.
                 }
             }
         }
 
-        vec![]
+        commit_batch_responses
     }
 
-    fn find_batches(
+    async fn find_batches(
         &self,
         find_batch_requests: Vec<FindBatchRequest>,
         _fetch_max_bytes: u32,
@@ -147,7 +170,7 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
             match file {
                 Ok(mut file) => {
-                    println!("Reading from position: {:#?}", request.offset);
+                    tracing::info!("Reading from position: {:#?}", request.offset);
 
                     let _result = file.seek(std::io::SeekFrom::Start(request.offset)).unwrap();
 
@@ -159,7 +182,7 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
                     match index {
                         Ok(index) => {
-                            println!("Received Index: {:#?}", index);
+                            tracing::info!("Received Index: {:#?}", index);
 
                             results.push(FindBatchResponse {
                                 errors: vec![],
@@ -196,7 +219,7 @@ impl BatchCoordinator for SimpleBatchCoordinator {
                     }
                 }
                 Err(err) => {
-                    println!("Error when creating index file: {:#?}", err);
+                    tracing::info!("Error when creating index file: {:#?}", err);
                     // TODO: File error and return to result.
                 }
             }
@@ -205,27 +228,30 @@ impl BatchCoordinator for SimpleBatchCoordinator {
         results
     }
 
-    fn list_offsets(&self, _requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse> {
+    async fn list_offsets(&self, _requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse> {
         todo!()
     }
 
-    fn delete_records(&self, _requests: Vec<DeleteRecordsRequest>) -> Vec<DeleteRecordsResponse> {
+    async fn delete_records(
+        &self,
+        _requests: Vec<DeleteRecordsRequest>,
+    ) -> Vec<DeleteRecordsResponse> {
         todo!()
     }
 
-    fn delete_topics(&self, _topic_ids: HashSet<uuid::Uuid>) {
+    async fn delete_topics(&self, _topic_ids: HashSet<uuid::Uuid>) {
         todo!()
     }
 
-    fn get_files_to_delete(&self) -> Vec<FileToDelete> {
+    async fn get_files_to_delete(&self) -> Vec<FileToDelete> {
         todo!()
     }
 
-    fn delete_files(&self, _request: DeleteFilesRequest) {
+    async fn delete_files(&self, _request: DeleteFilesRequest) {
         todo!()
     }
 
-    fn is_safe_to_delete_file(&self, _object_key: String) -> bool {
+    async fn is_safe_to_delete_file(&self, _object_key: String) -> bool {
         todo!()
     }
 }
@@ -241,8 +267,8 @@ mod tests {
     use uuid::Uuid;
 
     fn create_test_dir() -> tempdir::TempDir {
-        let temp_dir = TempDir::new("test_dir_prefix").unwrap();
-        temp_dir
+        
+        TempDir::new("test_dir_prefix").unwrap()
     }
 
     // Helper function to create a test coordinator with a temp directory
@@ -362,8 +388,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_commit_file_creates_index_file() {
+    #[tokio::test]
+    async fn test_commit_file_creates_index_file() {
         let (coordinator, temp_dir) = create_test_coordinator();
         let topic = "test_topic".to_string();
         let partition = 1;
@@ -393,7 +419,7 @@ mod tests {
         assert!(!expected_file_path.exists());
 
         // Commit the file
-        coordinator.commit_file(object_key, 1, 100, batches);
+        coordinator.commit_file(object_key, 1, 100, batches).await;
 
         // File should now exist
         assert!(expected_file_path.exists());
@@ -407,9 +433,19 @@ mod tests {
         assert_ne!(buf, [0u8; 28]);
     }
 
-    #[test]
-    fn test_find_batches_reads_correct_data() {
-        let (coordinator, _) = create_test_coordinator();
+    #[tokio::test]
+    async fn test_find_batches_reads_correct_data() -> Result<(), Box<dyn std::error::Error>> {
+        let (coordinator, dir) = create_test_coordinator();
+
+        // TODO: This behaviour likely needs to be implemented in the SimpleBatchCoordinator.
+        let data_path = dir.path();
+        data_path.to_path_buf().push("data");
+        let index_path = dir.path();
+        index_path.to_path_buf().push("index");
+
+        let _ = std::fs::create_dir(data_path);
+        let _ = std::fs::create_dir(index_path);
+
         let topic = "test_topic".to_string();
         let partition = 1;
 
@@ -433,7 +469,7 @@ mod tests {
             last_sequence: 0,
         }];
 
-        coordinator.commit_file(object_key, 1, 100, batches);
+        coordinator.commit_file(object_key, 1, 100, batches).await;
 
         // Now try to find the batch
         let find_requests = vec![FindBatchRequest {
@@ -442,7 +478,7 @@ mod tests {
             max_partition_fetch_bytes: 1024,
         }];
 
-        let results = coordinator.find_batches(find_requests, 1024);
+        let results = coordinator.find_batches(find_requests, 1024).await;
 
         assert_eq!(results.len(), 1);
         let response = &results[0];
@@ -453,12 +489,14 @@ mod tests {
         let batch = &response.batches[0];
         assert_eq!(batch.metadata.byte_offset, offset);
         assert_eq!(batch.metadata.byte_size, size);
+
+        Ok(())
     }
 
-    // #[test]
+    // #[tokio::test]
     // Not Implemented yet.
     #[allow(dead_code)]
-    fn test_find_batches_handles_missing_file() {
+    async fn test_find_batches_handles_missing_file() {
         let (coordinator, _) = create_test_coordinator();
 
         let find_requests = vec![FindBatchRequest {
@@ -467,7 +505,7 @@ mod tests {
             max_partition_fetch_bytes: 1024,
         }];
 
-        let results = coordinator.find_batches(find_requests, 1024);
+        let results = coordinator.find_batches(find_requests, 1024).await;
 
         assert_eq!(results.len(), 1);
         let response = &results[0];

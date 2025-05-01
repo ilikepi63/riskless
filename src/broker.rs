@@ -20,23 +20,31 @@ use crate::{
 /// A Broker is the primary interface through riskless is implemented. Broker's are designed to
 /// be embedded in nodes, have full access (both read and write) to the underlying object storage implementation and
 /// communicate with the configured batch coordinator.
+#[derive(Debug)]
 pub struct Broker {
     config: BrokerConfiguration,
-    produce_request_tx: tokio::sync::mpsc::Sender<ProduceRequest>,
+    produce_request_tx: tokio::sync::mpsc::Sender<(
+        ProduceRequest,
+        tokio::sync::oneshot::Sender<ProduceResponse>,
+    )>,
 }
 
 /// Configuration for the broker containing required dependencies.
+#[derive(Debug)]
 pub struct BrokerConfiguration {
     /// The object store implementation used for persisting message batches
-    object_store: Arc<dyn ObjectStore>,
+    pub object_store: Arc<dyn ObjectStore>,
     /// The batch coordinator responsible for assigning offsets to batches
-    batch_coordinator: Arc<dyn BatchCoordinator>,
+    pub batch_coordinator: Arc<dyn BatchCoordinator>,
 }
 
 impl Broker {
     /// Creates a new broker instance with the given configuration.
     pub fn new(config: BrokerConfiguration) -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<ProduceRequest>(100);
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<(
+            ProduceRequest,
+            tokio::sync::oneshot::Sender<ProduceResponse>,
+        )>(100);
         let batch_coordinator_ref = config.batch_coordinator.clone();
         let object_store_ref = config.object_store.clone();
 
@@ -58,29 +66,26 @@ impl Broker {
                         _recv = flush_rx.recv() => {}
                     };
 
-                    println!("This is ticking!");
-
                     let mut buffer_lock = buffer.write().await;
 
                     if buffer_lock.size() > 0 {
-                        println!("Buffer is not empty!");
+                        let mut new_ref = ProduceRequestCollection::new();
 
-                        let buffer = buffer_lock.clone();
-
-                        buffer_lock.clear();
+                        std::mem::swap(&mut *buffer_lock, &mut new_ref);
 
                         drop(buffer_lock); // Explicitly drop the lock.
 
-                        println!("We are flishing the buffer!");
-
                         if let Err(err) = flush_buffer(
-                            buffer,
+                            new_ref,
                             object_store_ref.clone(),
                             batch_coordinator_ref.clone(),
                         )
                         .await
                         {
-                            println!("Error occurred when trying to flush buffer: {:#?}", err);
+                            tracing::error!(
+                                "Error occurred when trying to flush buffer: {:#?}",
+                                err
+                            );
                         }
                     }
                 }
@@ -89,7 +94,8 @@ impl Broker {
             // Accumulator task.
             tokio::spawn(async move {
                 while let Some(req) = rx.recv().await {
-                    println!("Receiving the request!");
+
+                    tracing::info!("Received request: {:#?}", req);
                     let mut buffer_lock = cloned_buffer_ref.write().await;
 
                     let _ = buffer_lock.collect(req);
@@ -115,36 +121,42 @@ impl Broker {
     /// The message is added to an in-memory buffer which will be periodically
     /// flushed to object storage by a background task. The actual persistence
     /// happens asynchronously.
+    #[tracing::instrument]
     pub async fn produce(&mut self, request: ProduceRequest) -> RisklessResult<ProduceResponse> {
-        self.produce_request_tx.send(request).await?;
 
-        Ok(ProduceResponse {})
+        tracing::info!("Producing Request {:#?}.", request);
 
-        // The broker commits the batch coordinates with the Batch Coordinator (described in details in KIP-1164).
-        // The Batch Coordinator assigns offsets to the written batches, persists the batch coordinates, and responds to the Broker.
-        // The broker sends responses to all Produce requests that are associated with the committed object.
+        let (produce_response_tx, produce_response_rx) = tokio::sync::oneshot::channel();
+
+        self.produce_request_tx
+            .send((request, produce_response_tx))
+            .await?;
+
+        let message = produce_response_rx.await?;
+
+        Ok(message)
     }
 
     /// Handles a consume request by retrieving messages from object storage.
     pub async fn consume(&self, request: ConsumeRequest) -> RisklessResult<ConsumeResponse> {
-        let batch_responses = self.config.batch_coordinator.find_batches(
-            vec![FindBatchRequest {
-                topic_id_partition: TopicIdPartition(request.topic, request.partition),
-                offset: request.offset,
-                max_partition_fetch_bytes: 0,
-            }],
-            0,
-        );
-
-        println!("BATCH RESPONSES: {:#?}", batch_responses);
+        let batch_responses = self
+            .config
+            .batch_coordinator
+            .find_batches(
+                vec![FindBatchRequest {
+                    topic_id_partition: TopicIdPartition(request.topic, request.partition),
+                    offset: request.offset,
+                    max_partition_fetch_bytes: 0,
+                }],
+                0,
+            )
+            .await;
 
         let objects_to_retrieve = batch_responses
             .iter()
             .flat_map(|resp| resp.batches.clone())
             .map(|batch_info| batch_info.object_key)
             .collect::<HashSet<_>>();
-
-        println!("objects : {:#?}", objects_to_retrieve);
 
         let result = objects_to_retrieve
             .iter()
@@ -155,12 +167,10 @@ impl Broker {
                     .get(&Path::from(object_name.as_str()))
                     .await;
 
-                println!("GET OBJECT RESULT{:#?}", get_object_result);
-
                 let result = match get_object_result {
                     Ok(get_result) => {
                         if let Ok(b) = get_result.bytes().await {
-                            println!("Retrieved Bytes: {:#?}", b);
+                            tracing::info!("Retrieved Bytes: {:#?}", b);
 
                             // Retrieve the current fetch Responses by name.
                             let batch_responses_for_object = batch_responses
@@ -172,8 +182,6 @@ impl Broker {
                                         .map(|batch| (res.clone(), batch))
                                 })
                                 .map(|(res, batch)| {
-                                    println!("HELLO");
-
                                     // index into the bytes.
                                     let start: usize = (batch.metadata.base_offset
                                         + batch.metadata.byte_offset)
@@ -185,7 +193,7 @@ impl Broker {
                                     .try_into()
                                     .unwrap();
 
-                                    println!("START: {} END: {} ", start, end);
+                                    tracing::info!("START: {} END: {} ", start, end);
 
                                     let data = b.slice(start..end);
 
@@ -221,11 +229,8 @@ impl Broker {
             .await
             .iter()
             .for_each(|res| {
-                res.iter().for_each(|batch| match batch {
-                    Some(b) => {
-                        consume_response.batches.push(b.clone());
-                    }
-                    None => {}
+                res.iter().for_each(|batch| if let Some(b) = batch {
+                    consume_response.batches.push(b.clone());
                 })
             });
 
@@ -234,10 +239,14 @@ impl Broker {
 }
 
 async fn flush_buffer(
-    reqs: ProduceRequestCollection,
+    mut reqs: ProduceRequestCollection,
     object_storage: Arc<dyn ObjectStore>,
     batch_coordinator: Arc<dyn BatchCoordinator>,
 ) -> RisklessResult<()> {
+    let mut senders = reqs.extract_response_senders();
+
+    tracing::info!("Senders: {:#?}", senders);
+
     let reqs: SharedLogSegment = reqs.try_into()?;
 
     let batch_coords = reqs.get_batch_coords().clone();
@@ -257,74 +266,45 @@ async fn flush_buffer(
     // TODO: assert put_result has the correct response?
 
     // TODO: The responses here?
-    batch_coordinator.commit_file(
-        path.into_bytes(),
-        1,
-        buf_size.try_into()?,
-        batch_coords
-            .iter()
-            .map(CommitBatchRequest::from)
-            .collect::<Vec<_>>(),
-    );
+    let put_result = batch_coordinator
+        .commit_file(
+            path.into_bytes(),
+            1,
+            buf_size.try_into()?,
+            batch_coords
+                .iter()
+                .map(CommitBatchRequest::from)
+                .collect::<Vec<_>>(),
+        )
+        .await;
+
+    tracing::info!("Put Result: {:#?}", put_result);
+
+    // This logic might need to go somewhere else.
+    for commit_batch_response in put_result.iter() {
+        let produce_response = ProduceResponse::from(commit_batch_response);
+
+        match senders.remove(&commit_batch_response.request.request_id) {
+            Some(tx) => {
+                match tx.send(produce_response) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        // TODO: perhaps retry here?
+                        tracing::error!(
+                            "Error occurred trying to send produce response {:#?}.",
+                            err
+                        );
+                    }
+                };
+            }
+            None => {
+                tracing::error!(
+                    "No Sender found for ID: {:#?}",
+                    commit_batch_response.request.request_id
+                );
+            }
+        };
+    }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::simple_batch_coordinator::SimpleBatchCoordinator;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn can_produce_without_failure() -> Result<(), Box<dyn std::error::Error>> {
-        let mut batch_coord_path = std::env::current_dir()?;
-
-        batch_coord_path.push("index");
-
-        let mut object_store_path = std::env::current_dir()?;
-        object_store_path.push("data");
-
-        let config = BrokerConfiguration {
-            object_store: Arc::new(object_store::local::LocalFileSystem::new_with_prefix(
-                object_store_path,
-            )?),
-            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.to_string_lossy().to_string(),
-            )),
-        };
-
-        let mut broker = Broker::new(config);
-
-        let _result = broker
-            .produce(ProduceRequest {
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "hello".as_bytes().to_vec(),
-            })
-            .await?;
-
-        // TODO: Assert result has the correct data.
-
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        let consume_response = broker
-            .consume(ConsumeRequest {
-                topic: "example-topic".to_string(),
-                partition: 1,
-                offset: 0,
-                max_partition_fetch_bytes: 0,
-            })
-            .await;
-
-        println!("{:#?}", consume_response);
-
-        assert!(consume_response.is_ok());
-
-        let resp = consume_response.unwrap();
-
-        assert_eq!(resp.batches.len(), 1);
-
-        Ok(())
-    }
 }

@@ -20,6 +20,8 @@ pub enum RisklessError {
     TryFromSliceConversionrror(#[from] TryFromSliceError),
     #[error("IO Error")]
     IoError(#[from] std::io::Error),
+    #[error("Tokio Oneshot Channel Receive Error")]
+    TokioOneshotChannelRecvError(#[from] tokio::sync::oneshot::error::RecvError),
     #[error("Uuid Error")]
     UuidError(#[from] uuid::Error),
 }
