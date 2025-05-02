@@ -64,7 +64,7 @@ impl SimpleBatchCoordinator {
             true => {
                 let mut open_opts = OpenOptions::new();
 
-                open_opts.append(true).write(true);
+                open_opts.append(true);
 
                 open_opts.open(current_partition_file)
             }

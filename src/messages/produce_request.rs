@@ -15,6 +15,7 @@ pub struct ProduceRequest {
     pub data: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub struct ProduceRequestCollection {
     inner: HashMap<TopicIdPartition, Vec<ProduceRequest>>,
     response_senders: HashMap<u32, tokio::sync::oneshot::Sender<ProduceResponse>>,

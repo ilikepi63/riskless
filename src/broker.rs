@@ -121,7 +121,7 @@ impl Broker {
     /// The message is added to an in-memory buffer which will be periodically
     /// flushed to object storage by a background task. The actual persistence
     /// happens asynchronously.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all, name = "produce")]
     pub async fn produce(&mut self, request: ProduceRequest) -> RisklessResult<ProduceResponse> {
 
         tracing::info!("Producing Request {:#?}.", request);
@@ -138,6 +138,7 @@ impl Broker {
     }
 
     /// Handles a consume request by retrieving messages from object storage.
+    #[tracing::instrument(skip_all, name = "consume")]
     pub async fn consume(&self, request: ConsumeRequest) -> RisklessResult<ConsumeResponse> {
         let batch_responses = self
             .config
@@ -247,6 +248,8 @@ async fn flush_buffer(
 
     tracing::info!("Senders: {:#?}", senders);
 
+    tracing::info!("Produce Requests: {:#?}", reqs);
+
     let reqs: SharedLogSegment = reqs.try_into()?;
 
     let batch_coords = reqs.get_batch_coords().clone();
@@ -280,8 +283,11 @@ async fn flush_buffer(
 
     tracing::info!("Put Result: {:#?}", put_result);
 
+    println!("Senders 2: {:#?}", senders);
+
     // This logic might need to go somewhere else.
     for commit_batch_response in put_result.iter() {
+
         let produce_response = ProduceResponse::from(commit_batch_response);
 
         match senders.remove(&commit_batch_response.request.request_id) {

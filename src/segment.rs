@@ -34,6 +34,7 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
                     base_offset,
                     offset,
                     size: size.try_into()?,
+                    request: req.clone()
                 });
             }
         }
