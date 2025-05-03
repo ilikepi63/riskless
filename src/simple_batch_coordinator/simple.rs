@@ -452,7 +452,6 @@ mod tests {
             "{:#?}",
             std::fs::read_dir(&whole_dir)
                 .unwrap()
-                .into_iter()
                 .collect::<Vec<_>>()
         );
 
@@ -619,7 +618,6 @@ mod tests {
         tracing::info!(
             "{:#?}",
             std::fs::read_dir(&index_path)?
-                .into_iter()
                 .collect::<Vec<_>>()
         );
 

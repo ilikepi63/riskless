@@ -283,8 +283,6 @@ async fn flush_buffer(
 
     tracing::info!("Put Result: {:#?}", put_result);
 
-    println!("Senders 2: {:#?}", senders);
-
     // This logic might need to go somewhere else.
     for commit_batch_response in put_result.iter() {
 
