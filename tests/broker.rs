@@ -293,4 +293,212 @@ mod tests {
 
         tear_down_dirs(batch_coord_path, object_store_path);
     }
+
+
+    #[tokio::test]
+    #[traced_test]
+    async fn can_produce_to_multiple_topics_and_partitions() {
+        let (batch_coord_path, object_store_path) = set_up_dirs();
+
+        let config = BrokerConfiguration {
+            object_store: Arc::new(
+                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            ),
+            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
+                batch_coord_path.to_string_lossy().to_string(),
+            )),
+        };
+
+        let mut broker = Broker::new(config);
+
+        let result = broker
+            .produce(ProduceRequest {
+                request_id: 1,
+                topic: "example-topic".to_string(),
+                partition: 1,
+                data: "hello".as_bytes().to_vec(),
+            })
+            .await;
+
+        tracing::info!(
+            "{:#?}",
+            std::fs::read_dir(&batch_coord_path)
+                .unwrap()
+                .into_iter()
+                .collect::<Vec<_>>()
+        );
+
+        let result = result.unwrap();
+        assert_eq!(result.request_id, 1);
+
+        tracing::info!("{:#?}", result.errors);
+
+        assert_eq!(result.errors.len(), 0);
+
+        let result = broker
+            .produce(ProduceRequest {
+                request_id: 2,
+                topic: "example-topic".to_string(),
+                partition: 1,
+                data: "example-topic-partition-one-first".as_bytes().to_vec(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.request_id, 2);
+
+        tracing::info!("{:#?}", result.errors);
+
+        assert_eq!(result.errors.len(), 0);
+
+        let result = broker
+            .produce(ProduceRequest {
+                request_id: 3,
+                topic: "example-topic".to_string(),
+                partition: 1,
+                data: "example-topic-partition-one-second".as_bytes().to_vec(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.request_id, 3);
+        assert_eq!(result.errors.len(), 0);
+
+
+        // Different Topics
+        let result = broker
+        .produce(ProduceRequest {
+            request_id: 4,
+            topic: "example-topic-two".to_string(),
+            partition: 1,
+            data: "example-topic-two-partition-one-first".as_bytes().to_vec(),
+        })
+        .await;
+
+        let result = result.unwrap();
+        assert_eq!(result.request_id, 4);
+
+        tracing::info!("{:#?}", result.errors);
+
+        assert_eq!(result.errors.len(), 0);
+
+        let result = broker
+            .produce(ProduceRequest {
+                request_id: 5,
+                topic: "example-topic-two".to_string(),
+                partition: 1,
+                data: "example-topic-two-partition-one-second".as_bytes().to_vec(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.request_id, 5);
+
+        tracing::info!("{:#?}", result.errors);
+
+        assert_eq!(result.errors.len(), 0);
+
+        let result = broker
+            .produce(ProduceRequest {
+                request_id: 6,
+                topic: "example-topic-two".to_string(),
+                partition: 2,
+                data: "example-topic-two-partition-two-first".as_bytes().to_vec(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.request_id, 6);
+        assert_eq!(result.errors.len(), 0);
+
+        let consume_response = broker
+            .consume(ConsumeRequest {
+                topic: "example-topic".to_string(),
+                partition: 1,
+                offset: 0,
+                max_partition_fetch_bytes: 0,
+            })
+            .await;
+
+        assert_eq!(consume_response.unwrap().batches.len(), 1);
+
+        let consume_response = broker
+            .consume(ConsumeRequest {
+                topic: "example-topic".to_string(),
+                partition: 1,
+                offset: 1,
+                max_partition_fetch_bytes: 0,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(consume_response.batches.len(), 1);
+        assert_eq!(
+            consume_response.batches.get(0).unwrap().data,
+            bytes::Bytes::from_static(b"example-topic-partition-one-first")
+        );
+
+        let consume_response = broker
+            .consume(ConsumeRequest {
+                topic: "example-topic".to_string(),
+                partition: 1,
+                offset: 2,
+                max_partition_fetch_bytes: 0,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(consume_response.batches.len(), 1);
+        assert_eq!(
+            consume_response.batches.get(0).unwrap().data,
+            bytes::Bytes::from_static(b"example-topic-partition-one-second")
+        );
+
+
+        let consume_response = broker
+        .consume(ConsumeRequest {
+            topic: "example-topic-two".to_string(),
+            partition: 1,
+            offset: 0,
+            max_partition_fetch_bytes: 0,
+        })
+        .await;
+
+        assert_eq!(consume_response.unwrap().batches.len(), 1);
+
+        let consume_response = broker
+            .consume(ConsumeRequest {
+                topic: "example-topic-two".to_string(),
+                partition: 2,
+                offset: 0,
+                max_partition_fetch_bytes: 0,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(consume_response.batches.len(), 1);
+        assert_eq!(
+            consume_response.batches.get(0).unwrap().data,
+            bytes::Bytes::from_static(b"example-topic-two-partition-two-first")
+        );
+
+        let consume_response = broker
+            .consume(ConsumeRequest {
+                topic: "example-topic-two".to_string(),
+                partition: 1,
+                offset: 1,
+                max_partition_fetch_bytes: 0,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(consume_response.batches.len(), 1);
+        assert_eq!(
+            consume_response.batches.get(0).unwrap().data,
+            bytes::Bytes::from_static(b"example-topic-two-partition-one-second")
+        );
+
+        tear_down_dirs(batch_coord_path, object_store_path);
+    }
+
 }
