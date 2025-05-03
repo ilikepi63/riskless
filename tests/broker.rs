@@ -71,7 +71,7 @@ mod tests {
 
         assert_eq!(resp.batches.len(), 1);
         assert_eq!(
-            resp.batches.get(0).unwrap().data,
+            resp.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"hello")
         );
 
@@ -156,7 +156,7 @@ mod tests {
 
         assert_eq!(consume_response.batches.len(), 1);
         assert_eq!(
-            consume_response.batches.get(0).unwrap().data,
+            consume_response.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"partition-two")
         );
 
@@ -172,7 +172,7 @@ mod tests {
 
         assert_eq!(consume_response.batches.len(), 1);
         assert_eq!(
-            consume_response.batches.get(0).unwrap().data,
+            consume_response.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"partition-three")
         );
 
@@ -208,7 +208,6 @@ mod tests {
             "{:#?}",
             std::fs::read_dir(&batch_coord_path)
                 .unwrap()
-                .into_iter()
                 .collect::<Vec<_>>()
         );
 
@@ -271,7 +270,7 @@ mod tests {
 
         assert_eq!(consume_response.batches.len(), 1);
         assert_eq!(
-            consume_response.batches.get(0).unwrap().data,
+            consume_response.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"partition-two")
         );
 
@@ -287,7 +286,7 @@ mod tests {
 
         assert_eq!(consume_response.batches.len(), 1);
         assert_eq!(
-            consume_response.batches.get(0).unwrap().data,
+            consume_response.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"partition-three")
         );
 
@@ -324,7 +323,6 @@ mod tests {
             "{:#?}",
             std::fs::read_dir(&batch_coord_path)
                 .unwrap()
-                .into_iter()
                 .collect::<Vec<_>>()
         );
 
@@ -434,7 +432,7 @@ mod tests {
 
         assert_eq!(consume_response.batches.len(), 1);
         assert_eq!(
-            consume_response.batches.get(0).unwrap().data,
+            consume_response.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"example-topic-partition-one-first")
         );
 
@@ -450,7 +448,7 @@ mod tests {
 
         assert_eq!(consume_response.batches.len(), 1);
         assert_eq!(
-            consume_response.batches.get(0).unwrap().data,
+            consume_response.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"example-topic-partition-one-second")
         );
 
@@ -478,7 +476,7 @@ mod tests {
 
         assert_eq!(consume_response.batches.len(), 1);
         assert_eq!(
-            consume_response.batches.get(0).unwrap().data,
+            consume_response.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"example-topic-two-partition-two-first")
         );
 
@@ -494,7 +492,7 @@ mod tests {
 
         assert_eq!(consume_response.batches.len(), 1);
         assert_eq!(
-            consume_response.batches.get(0).unwrap().data,
+            consume_response.batches.first().unwrap().data,
             bytes::Bytes::from_static(b"example-topic-two-partition-one-second")
         );
 
