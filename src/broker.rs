@@ -36,6 +36,8 @@ pub struct BrokerConfiguration {
     pub object_store: Arc<dyn ObjectStore>,
     /// The batch coordinator responsible for assigning offsets to batches
     pub batch_coordinator: Arc<dyn BatchCoordinator>,
+    pub flush_interval_in_ms: u64, 
+    pub segment_size_in_bytes: u64
 }
 
 impl Broker {
@@ -48,66 +50,60 @@ impl Broker {
         let batch_coordinator_ref = config.batch_coordinator.clone();
         let object_store_ref = config.object_store.clone();
 
+        let buffer: Arc<RwLock<ProduceRequestCollection>> =
+            Arc::new(RwLock::new(ProduceRequestCollection::new()));
+        let cloned_buffer_ref = buffer.clone();
+
+        let (flush_tx, mut flush_rx) = tokio::sync::mpsc::channel::<()>(1);
+
+        // Flusher task.
         tokio::task::spawn(async move {
-            let buffer: Arc<RwLock<ProduceRequestCollection>> =
-                Arc::new(RwLock::new(ProduceRequestCollection::new()));
-            let cloned_buffer_ref = buffer.clone();
+            loop {
+                let timer = tokio::time::sleep(Duration::from_millis(config.flush_interval_in_ms)); // TODO: retrieve this from the configuration.
 
-            let (flush_tx, mut flush_rx) = tokio::sync::mpsc::channel::<()>(1);
+                // Await either a flush command or a timer expiry.
+                tokio::select! {
+                    _timer = timer => {    },
+                    _recv = flush_rx.recv() => {}
+                };
 
-            // Flusher task.
-            tokio::task::spawn(async move {
-                loop {
-                    let timer = tokio::time::sleep(Duration::from_millis(500)); // TODO: retrieve this from the configuration.
+                let mut buffer_lock = buffer.write().await;
 
-                    // Await either a flush command or a timer expiry.
-                    tokio::select! {
-                        _timer = timer => {    },
-                        _recv = flush_rx.recv() => {}
-                    };
+                if buffer_lock.size() > 0 {
+                    let mut new_ref = ProduceRequestCollection::new();
 
-                    let mut buffer_lock = buffer.write().await;
+                    std::mem::swap(&mut *buffer_lock, &mut new_ref);
 
-                    if buffer_lock.size() > 0 {
-                        let mut new_ref = ProduceRequestCollection::new();
+                    drop(buffer_lock); // Explicitly drop the lock.
 
-                        std::mem::swap(&mut *buffer_lock, &mut new_ref);
-
-                        drop(buffer_lock); // Explicitly drop the lock.
-
-                        if let Err(err) = flush_buffer(
-                            new_ref,
-                            object_store_ref.clone(),
-                            batch_coordinator_ref.clone(),
-                        )
-                        .await
-                        {
-                            tracing::error!(
-                                "Error occurred when trying to flush buffer: {:#?}",
-                                err
-                            );
-                        }
+                    if let Err(err) = flush_buffer(
+                        new_ref,
+                        object_store_ref.clone(),
+                        batch_coordinator_ref.clone(),
+                    )
+                    .await
+                    {
+                        tracing::error!("Error occurred when trying to flush buffer: {:#?}", err);
                     }
                 }
-            });
+            }
+        });
 
-            // Accumulator task.
-            tokio::spawn(async move {
-                while let Some(req) = rx.recv().await {
+        // Accumulator task.
+        tokio::spawn(async move {
+            while let Some(req) = rx.recv().await {
+                tracing::info!("Received request: {:#?}", req);
+                let mut buffer_lock = cloned_buffer_ref.write().await;
 
-                    tracing::info!("Received request: {:#?}", req);
-                    let mut buffer_lock = cloned_buffer_ref.write().await;
+                let _ = buffer_lock.collect(req);
 
-                    let _ = buffer_lock.collect(req);
-
-                    // TODO: This is currently hardcoded to 50kb, but we possibly want to make
-                    if buffer_lock.size() > 50_000 {
-                        let _ = flush_tx.send(()).await;
-                    }
+                // TODO: This is currently hardcoded to 50kb, but we possibly want to make
+                if buffer_lock.size() > config.segment_size_in_bytes {
+                    let _ = flush_tx.send(()).await;
                 }
+            }
 
-                // TODO: what here if there is None?
-            });
+            // TODO: what here if there is None?
         });
 
         Self {
@@ -123,7 +119,6 @@ impl Broker {
     /// happens asynchronously.
     #[tracing::instrument(skip_all, name = "produce")]
     pub async fn produce(&mut self, request: ProduceRequest) -> RisklessResult<ProduceResponse> {
-
         tracing::info!("Producing Request {:#?}.", request);
 
         let (produce_response_tx, produce_response_rx) = tokio::sync::oneshot::channel();
@@ -230,8 +225,10 @@ impl Broker {
             .await
             .iter()
             .for_each(|res| {
-                res.iter().for_each(|batch| if let Some(b) = batch {
-                    consume_response.batches.push(b.clone());
+                res.iter().for_each(|batch| {
+                    if let Some(b) = batch {
+                        consume_response.batches.push(b.clone());
+                    }
                 })
             });
 
@@ -285,7 +282,6 @@ async fn flush_buffer(
 
     // This logic might need to go somewhere else.
     for commit_batch_response in put_result.iter() {
-
         let produce_response = ProduceResponse::from(commit_batch_response);
 
         match senders.remove(&commit_batch_response.request.request_id) {

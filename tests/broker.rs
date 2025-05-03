@@ -9,7 +9,6 @@ mod tests {
     use tracing_test::traced_test;
 
     fn set_up_dirs() -> (PathBuf, PathBuf) {
-
         // UUIDs are used to ensure uniqueness. Note: this may make test a little flaky on chance of collision.
         let mut batch_coord_path = std::env::temp_dir();
         batch_coord_path.push(uuid::Uuid::new_v4().to_string());
@@ -39,6 +38,8 @@ mod tests {
             batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
                 batch_coord_path.to_string_lossy().to_string(),
             )),
+            segment_size_in_bytes: 50_000,
+            flush_interval_in_ms: 500,
         };
 
         let mut broker = Broker::new(config);
@@ -90,6 +91,8 @@ mod tests {
             batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
                 batch_coord_path.to_string_lossy().to_string(),
             )),
+            segment_size_in_bytes: 50_000,
+            flush_interval_in_ms: 500,
         };
 
         let mut broker = Broker::new(config);
@@ -191,6 +194,8 @@ mod tests {
             batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
                 batch_coord_path.to_string_lossy().to_string(),
             )),
+            segment_size_in_bytes: 50_000,
+            flush_interval_in_ms: 500,
         };
 
         let mut broker = Broker::new(config);
@@ -293,7 +298,6 @@ mod tests {
         tear_down_dirs(batch_coord_path, object_store_path);
     }
 
-
     #[tokio::test]
     #[traced_test]
     async fn can_produce_to_multiple_topics_and_partitions() {
@@ -306,6 +310,8 @@ mod tests {
             batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
                 batch_coord_path.to_string_lossy().to_string(),
             )),
+            segment_size_in_bytes: 50_000,
+            flush_interval_in_ms: 500,
         };
 
         let mut broker = Broker::new(config);
@@ -362,16 +368,15 @@ mod tests {
         assert_eq!(result.request_id, 3);
         assert_eq!(result.errors.len(), 0);
 
-
         // Different Topics
         let result = broker
-        .produce(ProduceRequest {
-            request_id: 4,
-            topic: "example-topic-two".to_string(),
-            partition: 1,
-            data: "example-topic-two-partition-one-first".as_bytes().to_vec(),
-        })
-        .await;
+            .produce(ProduceRequest {
+                request_id: 4,
+                topic: "example-topic-two".to_string(),
+                partition: 1,
+                data: "example-topic-two-partition-one-first".as_bytes().to_vec(),
+            })
+            .await;
 
         let result = result.unwrap();
         assert_eq!(result.request_id, 4);
@@ -452,15 +457,14 @@ mod tests {
             bytes::Bytes::from_static(b"example-topic-partition-one-second")
         );
 
-
         let consume_response = broker
-        .consume(ConsumeRequest {
-            topic: "example-topic-two".to_string(),
-            partition: 1,
-            offset: 0,
-            max_partition_fetch_bytes: 0,
-        })
-        .await;
+            .consume(ConsumeRequest {
+                topic: "example-topic-two".to_string(),
+                partition: 1,
+                offset: 0,
+                max_partition_fetch_bytes: 0,
+            })
+            .await;
 
         assert_eq!(consume_response.unwrap().batches.len(), 1);
 
@@ -498,5 +502,4 @@ mod tests {
 
         tear_down_dirs(batch_coord_path, object_store_path);
     }
-
 }
