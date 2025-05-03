@@ -20,7 +20,7 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
         let base_offset = 0;
 
         for partition in value.iter_partitions() {
-            for req in partition {
+            for req in partition.value() {
                 let offset: u64 = (buf.len()).try_into()?;
                 let size = req.data.len();
 
@@ -34,7 +34,7 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
                     base_offset,
                     offset,
                     size: size.try_into()?,
-                    request: req.clone()
+                    request: req.clone(),
                 });
             }
         }
@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_single_partition_single_request() -> Result<(), Box<dyn std::error::Error>> {
-        let mut collection = ProduceRequestCollection::new();
+        let collection = ProduceRequestCollection::new();
 
         let (tx, _rx) = tokio::sync::oneshot::channel();
 
@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn test_multiple_partitions_multiple_requests() -> Result<(), Box<dyn std::error::Error>> {
-        let mut collection = ProduceRequestCollection::new();
+        let collection = ProduceRequestCollection::new();
 
         let (tx, _rx) = tokio::sync::oneshot::channel();
 
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_large_data_offsets() -> Result<(), Box<dyn std::error::Error>> {
-        let mut collection = ProduceRequestCollection::new();
+        let collection = ProduceRequestCollection::new();
         let large_data = vec![0; 10000];
 
         let (tx, _rx) = tokio::sync::oneshot::channel();

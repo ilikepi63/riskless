@@ -36,8 +36,8 @@ pub struct BrokerConfiguration {
     pub object_store: Arc<dyn ObjectStore>,
     /// The batch coordinator responsible for assigning offsets to batches
     pub batch_coordinator: Arc<dyn BatchCoordinator>,
-    pub flush_interval_in_ms: u64, 
-    pub segment_size_in_bytes: u64
+    pub flush_interval_in_ms: u64,
+    pub segment_size_in_bytes: u64,
 }
 
 impl Broker {
@@ -47,11 +47,13 @@ impl Broker {
             ProduceRequest,
             tokio::sync::oneshot::Sender<ProduceResponse>,
         )>(100);
+
         let batch_coordinator_ref = config.batch_coordinator.clone();
         let object_store_ref = config.object_store.clone();
 
         let buffer: Arc<RwLock<ProduceRequestCollection>> =
             Arc::new(RwLock::new(ProduceRequestCollection::new()));
+
         let cloned_buffer_ref = buffer.clone();
 
         let (flush_tx, mut flush_rx) = tokio::sync::mpsc::channel::<()>(1);
@@ -93,7 +95,7 @@ impl Broker {
         tokio::spawn(async move {
             while let Some(req) = rx.recv().await {
                 tracing::info!("Received request: {:#?}", req);
-                let mut buffer_lock = cloned_buffer_ref.write().await;
+                let buffer_lock = cloned_buffer_ref.read().await;
 
                 let _ = buffer_lock.collect(req);
 
@@ -241,7 +243,7 @@ async fn flush_buffer(
     object_storage: Arc<dyn ObjectStore>,
     batch_coordinator: Arc<dyn BatchCoordinator>,
 ) -> RisklessResult<()> {
-    let mut senders = reqs.extract_response_senders();
+    let senders = reqs.extract_response_senders();
 
     tracing::info!("Senders: {:#?}", senders);
 
@@ -285,7 +287,7 @@ async fn flush_buffer(
         let produce_response = ProduceResponse::from(commit_batch_response);
 
         match senders.remove(&commit_batch_response.request.request_id) {
-            Some(tx) => {
+            Some((_, tx)) => {
                 match tx.send(produce_response) {
                     Ok(_) => {}
                     Err(err) => {

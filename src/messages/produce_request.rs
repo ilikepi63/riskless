@@ -1,7 +1,11 @@
-use std::collections::{
-    HashMap,
-    hash_map::{Entry, Values},
-};
+// use std::collections::{
+//     HashMap,
+//     hash_map::{Entry, Values},
+// };
+
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use dashmap::{DashMap, Entry, iter::IterMut};
 
 use crate::{batch_coordinator::TopicIdPartition, error::RisklessResult};
 
@@ -17,9 +21,9 @@ pub struct ProduceRequest {
 
 #[derive(Debug)]
 pub struct ProduceRequestCollection {
-    inner: HashMap<TopicIdPartition, Vec<ProduceRequest>>,
-    response_senders: HashMap<u32, tokio::sync::oneshot::Sender<ProduceResponse>>,
-    size: u64,
+    inner: DashMap<TopicIdPartition, Vec<ProduceRequest>>,
+    response_senders: DashMap<u32, tokio::sync::oneshot::Sender<ProduceResponse>>,
+    size: AtomicU64,
 }
 
 impl Default for ProduceRequestCollection {
@@ -31,9 +35,9 @@ impl Default for ProduceRequestCollection {
 impl ProduceRequestCollection {
     pub fn new() -> Self {
         Self {
-            inner: HashMap::new(),
-            response_senders: HashMap::new(),
-            size: 0,
+            inner: DashMap::new(),
+            response_senders: DashMap::new(),
+            size: AtomicU64::new(0),
         }
     }
 
@@ -42,8 +46,8 @@ impl ProduceRequestCollection {
     /// to allocate a new HashMap unnecessarily.
     pub fn extract_response_senders(
         &mut self,
-    ) -> HashMap<u32, tokio::sync::oneshot::Sender<ProduceResponse>> {
-        let mut hmap = HashMap::new();
+    ) -> DashMap<u32, tokio::sync::oneshot::Sender<ProduceResponse>> {
+        let mut hmap = DashMap::new();
 
         std::mem::swap(&mut hmap, &mut self.response_senders);
 
@@ -52,17 +56,16 @@ impl ProduceRequestCollection {
 
     pub fn clear(&mut self) {
         self.inner.clear();
-        self.size = 0;
+        self.size = AtomicU64::new(0);
     }
 
     pub fn collect(
-        &mut self,
+        &self,
         (req, sender): (
             ProduceRequest,
             tokio::sync::oneshot::Sender<ProduceResponse>,
         ),
     ) -> RisklessResult<()> {
-
         tracing::info!("Collecting: {} {:#?}", req.request_id, sender);
 
         self.response_senders.insert(req.request_id, sender);
@@ -73,11 +76,13 @@ impl ProduceRequestCollection {
 
         match entry {
             Entry::Occupied(mut occupied_entry) => {
-                self.size += TryInto::<u64>::try_into(req.data.len())?;
+                self.size
+                    .fetch_add(TryInto::<u64>::try_into(req.data.len())?, Ordering::Relaxed);
                 occupied_entry.get_mut().push(req);
             }
             Entry::Vacant(vacant_entry) => {
-                self.size += TryInto::<u64>::try_into(req.data.len())?;
+                self.size
+                    .fetch_add(TryInto::<u64>::try_into(req.data.len())?, Ordering::Relaxed);
                 vacant_entry.insert(vec![req]);
             }
         }
@@ -86,10 +91,10 @@ impl ProduceRequestCollection {
     }
 
     pub fn size(&self) -> u64 {
-        self.size
+        self.size.load(Ordering::Relaxed)
     }
 
-    pub fn iter_partitions(&mut self) -> Values<'_, TopicIdPartition, Vec<ProduceRequest>> {
-        self.inner.values()
+    pub fn iter_partitions(&mut self) -> IterMut<'_, TopicIdPartition, Vec<ProduceRequest>> {
+        self.inner.iter_mut()
     }
 }
