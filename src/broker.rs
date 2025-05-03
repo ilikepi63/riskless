@@ -15,6 +15,7 @@ use crate::{
         produce_response::ProduceResponse,
     },
     segment::SharedLogSegment,
+    utils::request_response::Request,
 };
 
 /// A Broker is the primary interface through riskless is implemented. Broker's are designed to
@@ -23,10 +24,7 @@ use crate::{
 #[derive(Debug)]
 pub struct Broker {
     config: BrokerConfiguration,
-    produce_request_tx: tokio::sync::mpsc::Sender<(
-        ProduceRequest,
-        tokio::sync::oneshot::Sender<ProduceResponse>,
-    )>,
+    produce_request_tx: tokio::sync::mpsc::Sender<Request<ProduceRequest, ProduceResponse>>,
 }
 
 /// Configuration for the broker containing required dependencies.
@@ -43,10 +41,8 @@ pub struct BrokerConfiguration {
 impl Broker {
     /// Creates a new broker instance with the given configuration.
     pub fn new(config: BrokerConfiguration) -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<(
-            ProduceRequest,
-            tokio::sync::oneshot::Sender<ProduceResponse>,
-        )>(100);
+        let (tx, mut rx) =
+            tokio::sync::mpsc::channel::<Request<ProduceRequest, ProduceResponse>>(100);
 
         let batch_coordinator_ref = config.batch_coordinator.clone();
         let object_store_ref = config.object_store.clone();
@@ -123,13 +119,13 @@ impl Broker {
     pub async fn produce(&mut self, request: ProduceRequest) -> RisklessResult<ProduceResponse> {
         tracing::info!("Producing Request {:#?}.", request);
 
-        let (produce_response_tx, produce_response_rx) = tokio::sync::oneshot::channel();
+        let (request, response) = Request::new(request);
 
-        self.produce_request_tx
-            .send((request, produce_response_tx))
-            .await?;
+        // let (produce_response_tx, produce_response_rx) = tokio::sync::oneshot::channel();
 
-        let message = produce_response_rx.await?;
+        self.produce_request_tx.send(request).await?;
+
+        let message = response.recv().await?;
 
         Ok(message)
     }
@@ -288,7 +284,7 @@ async fn flush_buffer(
 
         match senders.remove(&commit_batch_response.request.request_id) {
             Some((_, tx)) => {
-                match tx.send(produce_response) {
+                match tx.respond(produce_response) {
                     Ok(_) => {}
                     Err(err) => {
                         // TODO: perhaps retry here?
