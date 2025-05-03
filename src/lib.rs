@@ -3,6 +3,7 @@
 #![deny(clippy::print_stderr)]
 
 pub mod batch_coordinator;
+mod utils;
 mod broker;
 pub mod messages;
 mod segment;
