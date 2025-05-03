@@ -21,7 +21,9 @@ let mut object_store = ...; // Create an object store.
 
 let config = BrokerConfiguration {
     object_store,
-    batch_coordinator
+    batch_coordinator,
+    segment_size_in_bytes: 50_000,
+    flush_interval_in_ms: 500,
 };
 
 // Create the broker.
