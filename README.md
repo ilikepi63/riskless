@@ -2,6 +2,10 @@
 
 An implementation of KIP-1150 - Diskless Topics as a reuseable library for general implementation of distributed logs on object storage. 
 
+### Motivation
+
+Considering diskless partitions or separation between compute and storage for distributed logs is becoming more important than ever considering the costs of traditional implementations, this library was written with the intention to be built upon. When most organisations set out to build a distributed log, it is built with the intention to be fairly "monolithic" in nature. For example, most distributed log implementations come with a specific network protocol, consensus protocol, storage implementation and are generally quite opinionated with most of their implementations. Riskless is hopefully the first in a number of libraries that try to make distributed logs composable, similar to what the Apache Arrow/Datafusion projects are doing for traditional databases.
+
 ## Usage
 
 ### Installation
