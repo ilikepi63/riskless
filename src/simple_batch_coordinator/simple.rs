@@ -36,8 +36,6 @@ impl SimpleBatchCoordinator {
         let mut current_topic_dir = self.directory.clone();
         current_topic_dir.push(topic);
 
-        
-
         match current_topic_dir.exists() {
             true => current_topic_dir,
             false => {
@@ -62,8 +60,6 @@ impl SimpleBatchCoordinator {
 
         let file = match current_partition_file.exists() {
             true => {
-                tracing::info!("Doing this..");
-
                 let mut open_opts = OpenOptions::new();
 
                 open_opts.append(true);
@@ -73,7 +69,7 @@ impl SimpleBatchCoordinator {
             false => {
                 tracing::info!("Actually doing this..");
                 std::fs::File::create(current_partition_file)
-            },
+            }
         };
 
         tracing::info!("Result from file: {:#?}", file);
@@ -183,7 +179,9 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
                     let size_in_u64: u64 = Index::packed_size().try_into().unwrap();
 
-                    let _result = file.seek(std::io::SeekFrom::Start(request.offset * size_in_u64)).unwrap();
+                    let _result = file
+                        .seek(std::io::SeekFrom::Start(request.offset * size_in_u64))
+                        .unwrap();
 
                     let mut buf: [u8; 28] = [0; Index::packed_size()];
 
@@ -274,40 +272,41 @@ mod tests {
     use super::*;
     use std::fs::{self, File};
     use std::io::Read;
-    use tempdir::TempDir;
-    use tracing::info;
     use tracing_test::traced_test;
     use uuid::Uuid;
 
-    fn create_test_dir() -> tempdir::TempDir {
-        
-        TempDir::new("test_dir_prefix").unwrap()
+    fn set_up_dirs() -> PathBuf {
+        let mut batch_coord_path = std::env::temp_dir();
+        batch_coord_path.push(uuid::Uuid::new_v4().to_string());
+        std::fs::create_dir(&batch_coord_path).unwrap();
+
+        batch_coord_path
     }
 
-    // Helper function to create a test coordinator with a temp directory
-    fn create_test_coordinator() -> (SimpleBatchCoordinator, tempdir::TempDir) {
-        let temp_dir = TempDir::new("test_dir_prefix").unwrap();
-        let coordinator =
-            SimpleBatchCoordinator::new(temp_dir.path().to_str().unwrap().to_string());
-        (coordinator, temp_dir)
+    fn tear_down_dirs(batch_coord: PathBuf) {
+        std::fs::remove_dir_all(&batch_coord).unwrap();
     }
 
     #[test]
     fn test_new() {
-        let temp_dir = TempDir::new("test_dir_prefix").unwrap();
-        let path = temp_dir.path().to_str().unwrap().to_string();
+        let temp_dir = set_up_dirs();
+        let path = temp_dir.to_string_lossy().to_string();
         let coordinator = SimpleBatchCoordinator::new(path.clone());
 
         assert_eq!(coordinator.directory, PathBuf::from(path));
+        tear_down_dirs(temp_dir);
     }
 
     #[test]
     fn test_topic_dir_creates_directory_if_not_exists() {
-        let (coordinator, temp_dir) = create_test_coordinator();
+        let temp_dir = set_up_dirs();
+
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+
         let topic = "test_topic".to_string();
 
         // Directory shouldn't exist yet
-        let expected_path = temp_dir.path().join(&topic);
+        let expected_path = temp_dir.join(&topic);
         assert!(!expected_path.exists());
 
         // Call topic_dir which should create it
@@ -317,15 +316,19 @@ mod tests {
         assert_eq!(result, expected_path);
         assert!(expected_path.exists());
         assert!(expected_path.is_dir());
+        tear_down_dirs(temp_dir);
     }
 
     #[test]
     fn test_topic_dir_uses_existing_directory() {
-        let (coordinator, temp_dir) = create_test_coordinator();
+        let temp_dir = set_up_dirs();
+
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+
         let topic = "existing_topic".to_string();
 
         // Create the directory manually first
-        let expected_path = temp_dir.path().join(&topic);
+        let expected_path = temp_dir.join(&topic);
         fs::create_dir(&expected_path).unwrap();
 
         // Call topic_dir
@@ -333,6 +336,7 @@ mod tests {
 
         // Should return the existing directory
         assert_eq!(result, expected_path);
+        tear_down_dirs(temp_dir);
     }
 
     #[test]
@@ -351,8 +355,9 @@ mod tests {
 
     #[test]
     fn test_open_or_create_file_creates_new_file() {
-        let temp_dir = create_test_dir();
-        let file_path = temp_dir.path().join("test_file.index");
+        let temp_dir = set_up_dirs();
+
+        let file_path = temp_dir.join("test_file.index");
 
         // File shouldn't exist yet
         assert!(!file_path.exists());
@@ -363,12 +368,13 @@ mod tests {
 
         // File should now exist
         assert!(file_path.exists());
+        tear_down_dirs(temp_dir);
     }
 
     #[test]
     fn test_open_or_create_file_opens_existing_file() {
-        let temp_dir = create_test_dir();
-        let file_path = temp_dir.path().join("existing_file.index");
+        let temp_dir = set_up_dirs();
+        let file_path = temp_dir.join("existing_file.index");
 
         // Create the file first
         File::create(&file_path).unwrap();
@@ -376,12 +382,13 @@ mod tests {
         // Try to open
         let result = SimpleBatchCoordinator::open_or_create_file(&file_path);
         assert!(result.is_ok());
+        tear_down_dirs(temp_dir);
     }
 
     #[test]
     fn test_open_file_success() {
-        let temp_dir = create_test_dir();
-        let file_path = temp_dir.path().join("test_open_file.index");
+        let temp_dir = set_up_dirs();
+        let file_path = temp_dir.join("test_open_file.index");
 
         // Create the file first
         File::create(&file_path).unwrap();
@@ -389,21 +396,29 @@ mod tests {
         // Try to open
         let result = SimpleBatchCoordinator::open_file(&file_path);
         assert!(result.is_ok());
+        tear_down_dirs(temp_dir);
     }
 
     #[test]
     fn test_open_file_fails_when_not_exists() {
-        let temp_dir = create_test_dir();
-        let file_path = temp_dir.path().join("nonexistent_file.index");
+        let temp_dir = set_up_dirs();
+        let file_path = temp_dir.join("nonexistent_file.index");
 
         // Try to open
         let result = SimpleBatchCoordinator::open_file(&file_path);
         assert!(result.is_err());
+        tear_down_dirs(temp_dir);
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_commit_file_creates_index_file() {
-        let (coordinator, temp_dir) = create_test_coordinator();
+        let temp_dir = set_up_dirs();
+
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+
+        let whole_dir = temp_dir.clone();
+
         let topic = "test_topic".to_string();
         let partition = 1;
 
@@ -424,7 +439,6 @@ mod tests {
         }];
 
         let expected_file_path = temp_dir
-            .path()
             .join(&topic)
             .join(format!("{:0>20}.index", partition));
 
@@ -433,6 +447,14 @@ mod tests {
 
         // Commit the file
         coordinator.commit_file(object_key, 1, 100, batches).await;
+
+        tracing::info!(
+            "{:#?}",
+            std::fs::read_dir(&whole_dir)
+                .unwrap()
+                .into_iter()
+                .collect::<Vec<_>>()
+        );
 
         // File should now exist
         assert!(expected_file_path.exists());
@@ -444,16 +466,19 @@ mod tests {
 
         // You might want to add more specific assertions about the contents
         assert_ne!(buf, [0u8; 28]);
+        tear_down_dirs(whole_dir);
     }
 
     #[tokio::test]
     async fn test_find_batches_reads_correct_data() -> Result<(), Box<dyn std::error::Error>> {
-        let (coordinator, dir) = create_test_coordinator();
+        let temp_dir = set_up_dirs();
+
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
 
         // TODO: This behaviour likely needs to be implemented in the SimpleBatchCoordinator.
-        let data_path = dir.path();
+        let data_path = temp_dir.clone();
         data_path.to_path_buf().push("data");
-        let index_path = dir.path();
+        let index_path = temp_dir.clone();
         index_path.to_path_buf().push("index");
 
         let _ = std::fs::create_dir(data_path);
@@ -503,23 +528,25 @@ mod tests {
         assert_eq!(batch.metadata.byte_offset, offset);
         assert_eq!(batch.metadata.byte_size, size);
 
+        tear_down_dirs(temp_dir);
         Ok(())
     }
-
 
     #[tokio::test]
     #[traced_test]
     async fn test_multiple_writes() -> Result<(), Box<dyn std::error::Error>> {
-        let (coordinator, dir) = create_test_coordinator();
+        let temp_dir = set_up_dirs();
+
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
 
         // TODO: This behaviour likely needs to be implemented in the SimpleBatchCoordinator.
-        let data_path = dir.path();
+        let data_path = temp_dir.clone();
         data_path.to_path_buf().push("data");
-        let index_path = dir.path();
+        let index_path = temp_dir.clone();
         index_path.to_path_buf().push("index");
 
-        let _ = std::fs::create_dir(data_path);
-        let _ = std::fs::create_dir(index_path);
+        let _ = std::fs::create_dir(&data_path);
+        let _ = std::fs::create_dir(&index_path);
 
         let topic = "test_topic".to_string();
         let partition = 1;
@@ -562,8 +589,9 @@ mod tests {
             last_sequence: 0,
         }];
 
-        coordinator.commit_file(object_key_two, 1, 100, batches).await;
-
+        coordinator
+            .commit_file(object_key_two, 1, 100, batches)
+            .await;
 
         let batches = vec![CommitBatchRequest {
             topic_id_partition: TopicIdPartition(topic.clone(), partition),
@@ -580,15 +608,20 @@ mod tests {
             last_sequence: 0,
         }];
 
-        coordinator.commit_file(object_key_two, 1, 100, batches).await;
-
+        coordinator
+            .commit_file(object_key_two, 1, 100, batches)
+            .await;
 
         let mut index_path = index_path.to_path_buf();
 
         index_path.push(&topic);
 
-
-        tracing::info!("{:#?}", std::fs::read_dir(&index_path)?.into_iter().collect::<Vec<_>>());
+        tracing::info!(
+            "{:#?}",
+            std::fs::read_dir(&index_path)?
+                .into_iter()
+                .collect::<Vec<_>>()
+        );
 
         index_path.push(format!("{:0>20}.index", partition.to_string()));
 
@@ -619,7 +652,7 @@ mod tests {
 
         let find_requests = vec![FindBatchRequest {
             topic_id_partition: TopicIdPartition(topic.clone(), partition),
-            offset:1,
+            offset: 1,
             max_partition_fetch_bytes: 1024,
         }];
 
@@ -635,17 +668,18 @@ mod tests {
         assert_eq!(batch.metadata.byte_offset, 1);
         assert_eq!(batch.metadata.byte_size, size);
 
-
+        tear_down_dirs(temp_dir);
 
         Ok(())
     }
-
 
     // #[tokio::test]
     // Not Implemented yet.
     #[allow(dead_code)]
     async fn test_find_batches_handles_missing_file() {
-        let (coordinator, _) = create_test_coordinator();
+        let temp_dir = set_up_dirs();
+
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
 
         let find_requests = vec![FindBatchRequest {
             topic_id_partition: TopicIdPartition("nonexistent_topic".to_string(), 1),
@@ -661,5 +695,6 @@ mod tests {
         // Should have an error about the missing file
         assert!(!response.errors.is_empty());
         assert!(response.batches.is_empty());
+        tear_down_dirs(temp_dir);
     }
 }

@@ -17,6 +17,3 @@ futures = "0.3.31"
 async-trait = "0.1.88"
 tracing-subscriber = { version = "0.3"}
 tracing-test = {version = "0.2.5" , features = ["no-env-filter"]}
-
-[dev-dependencies]
-tempdir = "0.3"

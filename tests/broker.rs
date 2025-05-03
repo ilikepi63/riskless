@@ -4,21 +4,40 @@ mod tests {
     use riskless::messages::produce_request::ProduceRequest;
     use riskless::simple_batch_coordinator::SimpleBatchCoordinator;
     use riskless::{Broker, BrokerConfiguration};
+    use std::path::PathBuf;
     use std::sync::Arc;
     use tracing_test::traced_test;
+
+    fn set_up_dirs() -> (PathBuf, PathBuf) {
+
+        // UUIDs are used to ensure uniqueness. Note: this may make test a little flaky on chance of collision.
+        let mut batch_coord_path = std::env::temp_dir();
+        batch_coord_path.push(uuid::Uuid::new_v4().to_string());
+        let mut object_store_path = std::env::temp_dir();
+        object_store_path.push(uuid::Uuid::new_v4().to_string());
+
+        std::fs::create_dir(&batch_coord_path).unwrap();
+        std::fs::create_dir(&object_store_path).unwrap();
+
+        (batch_coord_path, object_store_path)
+    }
+
+    fn tear_down_dirs(batch_coord: PathBuf, object_store: PathBuf) {
+        std::fs::remove_dir_all(&batch_coord).unwrap();
+        std::fs::remove_dir_all(&object_store).unwrap();
+    }
 
     #[tokio::test]
     #[traced_test]
     async fn can_produce_without_failure() {
-        let batch_coord_path = tempdir::TempDir::new("index").unwrap();
-        let object_store_path = tempdir::TempDir::new("data").unwrap();
+        let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let config = BrokerConfiguration {
             object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(object_store_path).unwrap(),
+                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
             ),
             batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.path().to_string_lossy().to_string(),
+                batch_coord_path.to_string_lossy().to_string(),
             )),
         };
 
@@ -54,21 +73,22 @@ mod tests {
         assert_eq!(
             resp.batches.get(0).unwrap().data,
             bytes::Bytes::from_static(b"hello")
-        )
+        );
+
+        tear_down_dirs(batch_coord_path, object_store_path);
     }
 
     #[tokio::test]
     #[traced_test]
     async fn can_produce_to_multiple_partitions() {
-        let batch_coord_path = tempdir::TempDir::new("index").unwrap();
-        let object_store_path = tempdir::TempDir::new("data").unwrap();
+        let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let config = BrokerConfiguration {
             object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(object_store_path).unwrap(),
+                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
             ),
             batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.path().to_string_lossy().to_string(),
+                batch_coord_path.to_string_lossy().to_string(),
             )),
         };
 
@@ -154,21 +174,22 @@ mod tests {
         assert_eq!(
             consume_response.batches.get(0).unwrap().data,
             bytes::Bytes::from_static(b"partition-three")
-        )
+        );
+
+        tear_down_dirs(batch_coord_path, object_store_path);
     }
 
     #[tokio::test]
     #[traced_test]
     async fn can_produce_to_the_same_partition_multiple_times() {
-        let batch_coord_path = tempdir::TempDir::new("index").unwrap();
-        let object_store_path = tempdir::TempDir::new("data").unwrap();
+        let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let config = BrokerConfiguration {
             object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(object_store_path).unwrap(),
+                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
             ),
             batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.path().to_string_lossy().to_string(),
+                batch_coord_path.to_string_lossy().to_string(),
             )),
         };
 
@@ -183,7 +204,13 @@ mod tests {
             })
             .await;
 
-        tracing::info!("{:#?}", std::fs::read_dir(batch_coord_path).unwrap().into_iter().collect::<Vec<_>>());
+        tracing::info!(
+            "{:#?}",
+            std::fs::read_dir(&batch_coord_path)
+                .unwrap()
+                .into_iter()
+                .collect::<Vec<_>>()
+        );
 
         let result = result.unwrap();
         assert_eq!(result.request_id, 1);
@@ -262,6 +289,8 @@ mod tests {
         assert_eq!(
             consume_response.batches.get(0).unwrap().data,
             bytes::Bytes::from_static(b"partition-three")
-        )
+        );
+
+        tear_down_dirs(batch_coord_path, object_store_path);
     }
 }
