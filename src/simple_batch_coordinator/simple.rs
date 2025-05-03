@@ -53,25 +53,32 @@ impl SimpleBatchCoordinator {
     ) -> &mut PathBuf {
         topic_dir.push(format!("{:0>20}.index", partition.to_string()));
 
-        
-
         (topic_dir) as _
     }
 
     // I think you might be able to do this with the File API?
     fn open_or_create_file(current_partition_file: &PathBuf) -> RisklessResult<File> {
+        tracing::info!("File {:#?} exists.", current_partition_file);
+
         let file = match current_partition_file.exists() {
             true => {
+                tracing::info!("Doing this..");
+
                 let mut open_opts = OpenOptions::new();
 
                 open_opts.append(true);
 
                 open_opts.open(current_partition_file)
             }
-            false => std::fs::File::create(current_partition_file),
-        }?;
+            false => {
+                tracing::info!("Actually doing this..");
+                std::fs::File::create(current_partition_file)
+            },
+        };
 
-        Ok(file)
+        tracing::info!("Result from file: {:#?}", file);
+
+        Ok(file?)
     }
 
     fn open_file(current_partition_file: &PathBuf) -> RisklessResult<File> {
@@ -111,6 +118,8 @@ impl BatchCoordinator for SimpleBatchCoordinator {
             );
 
             let file = Self::open_or_create_file(current_partition_file);
+
+            tracing::info!("Result from file: {:#?}", file);
 
             match file {
                 Ok(mut file) => {
@@ -172,7 +181,9 @@ impl BatchCoordinator for SimpleBatchCoordinator {
                 Ok(mut file) => {
                     tracing::info!("Reading from position: {:#?}", request.offset);
 
-                    let _result = file.seek(std::io::SeekFrom::Start(request.offset)).unwrap();
+                    let size_in_u64: u64 = Index::packed_size().try_into().unwrap();
+
+                    let _result = file.seek(std::io::SeekFrom::Start(request.offset * size_in_u64)).unwrap();
 
                     let mut buf: [u8; 28] = [0; Index::packed_size()];
 
@@ -264,6 +275,8 @@ mod tests {
     use std::fs::{self, File};
     use std::io::Read;
     use tempdir::TempDir;
+    use tracing::info;
+    use tracing_test::traced_test;
     use uuid::Uuid;
 
     fn create_test_dir() -> tempdir::TempDir {
@@ -492,6 +505,141 @@ mod tests {
 
         Ok(())
     }
+
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_multiple_writes() -> Result<(), Box<dyn std::error::Error>> {
+        let (coordinator, dir) = create_test_coordinator();
+
+        // TODO: This behaviour likely needs to be implemented in the SimpleBatchCoordinator.
+        let data_path = dir.path();
+        data_path.to_path_buf().push("data");
+        let index_path = dir.path();
+        index_path.to_path_buf().push("index");
+
+        let _ = std::fs::create_dir(data_path);
+        let _ = std::fs::create_dir(index_path);
+
+        let topic = "test_topic".to_string();
+        let partition = 1;
+
+        // First, create an index file with some data
+        let object_key = Uuid::new_v4().into_bytes();
+        let object_key_two = Uuid::new_v4().into_bytes();
+        let offset = 0;
+        let size = 100;
+
+        let batches = vec![CommitBatchRequest {
+            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            byte_offset: offset,
+            size,
+            request_id: 1,
+            base_offset: 0,
+            last_offset: 0,
+            batch_max_timestamp: 0,
+            message_timestamp_type: crate::batch_coordinator::TimestampType::Dummy,
+            producer_id: 0,
+            producer_epoch: 0,
+            base_sequence: 0,
+            last_sequence: 0,
+        }];
+
+        coordinator.commit_file(object_key, 1, 100, batches).await;
+
+        let batches = vec![CommitBatchRequest {
+            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            byte_offset: 1,
+            size,
+            request_id: 1,
+            base_offset: 0,
+            last_offset: 0,
+            batch_max_timestamp: 0,
+            message_timestamp_type: crate::batch_coordinator::TimestampType::Dummy,
+            producer_id: 0,
+            producer_epoch: 0,
+            base_sequence: 0,
+            last_sequence: 0,
+        }];
+
+        coordinator.commit_file(object_key_two, 1, 100, batches).await;
+
+
+        let batches = vec![CommitBatchRequest {
+            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            byte_offset: 1,
+            size,
+            request_id: 2,
+            base_offset: 0,
+            last_offset: 0,
+            batch_max_timestamp: 0,
+            message_timestamp_type: crate::batch_coordinator::TimestampType::Dummy,
+            producer_id: 0,
+            producer_epoch: 0,
+            base_sequence: 0,
+            last_sequence: 0,
+        }];
+
+        coordinator.commit_file(object_key_two, 1, 100, batches).await;
+
+
+        let mut index_path = index_path.to_path_buf();
+
+        index_path.push(&topic);
+
+
+        tracing::info!("{:#?}", std::fs::read_dir(&index_path)?.into_iter().collect::<Vec<_>>());
+
+        index_path.push(format!("{:0>20}.index", partition.to_string()));
+
+        tracing::info!("{:#?}", index_path);
+
+        let data = std::fs::read(index_path)?;
+
+        assert_eq!(data.len(), Index::packed_size() * 3);
+
+        // Now try to find the batch
+        let find_requests = vec![FindBatchRequest {
+            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            offset,
+            max_partition_fetch_bytes: 1024,
+        }];
+
+        let results = coordinator.find_batches(find_requests, 1024).await;
+
+        assert_eq!(results.len(), 1);
+        let response = &results[0];
+
+        assert!(response.errors.is_empty());
+        assert_eq!(response.batches.len(), 1);
+
+        let batch = &response.batches[0];
+        assert_eq!(batch.metadata.byte_offset, offset);
+        assert_eq!(batch.metadata.byte_size, size);
+
+        let find_requests = vec![FindBatchRequest {
+            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            offset:1,
+            max_partition_fetch_bytes: 1024,
+        }];
+
+        let results = coordinator.find_batches(find_requests, 1024).await;
+
+        assert_eq!(results.len(), 1);
+        let response = &results[0];
+
+        assert!(response.errors.is_empty());
+        assert_eq!(response.batches.len(), 1);
+
+        let batch = &response.batches[0];
+        assert_eq!(batch.metadata.byte_offset, 1);
+        assert_eq!(batch.metadata.byte_size, size);
+
+
+
+        Ok(())
+    }
+
 
     // #[tokio::test]
     // Not Implemented yet.

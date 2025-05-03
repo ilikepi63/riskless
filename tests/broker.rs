@@ -187,6 +187,9 @@ mod tests {
 
         let result = result.unwrap();
         assert_eq!(result.request_id, 1);
+
+        tracing::info!("{:#?}", result.errors);
+
         assert_eq!(result.errors.len(), 0);
 
         let result = broker
@@ -200,6 +203,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.request_id, 2);
+
+        tracing::info!("{:#?}", result.errors);
+
         assert_eq!(result.errors.len(), 0);
 
         let result = broker
