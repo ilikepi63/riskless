@@ -46,14 +46,15 @@ let produce_result = broker
     })
     .await?;
 
-let response = broker
+let receiver = broker
     .consume(ConsumeRequest {
         topic: "example-topic".to_string(),
         partition: 1,
         offset: 0,
         max_partition_fetch_bytes: 50_000,
-    })
-    .await;
+    });
+
+let response = receiver.recv().await;    
 ```
 
 #### Implementation of BatchCoordinator
