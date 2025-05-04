@@ -24,7 +24,8 @@ use crate::{
 #[derive(Debug)]
 pub struct Broker {
     config: BrokerConfiguration,
-    produce_request_tx: tokio::sync::mpsc::Sender<Request<ProduceRequest, ProduceResponse>>,
+    request_collection: Arc<RwLock<ProduceRequestCollection>>,
+    flusher: tokio::sync::mpsc::Sender<()>,
 }
 
 /// Configuration for the broker containing required dependencies.
@@ -41,9 +42,6 @@ pub struct BrokerConfiguration {
 impl Broker {
     /// Creates a new broker instance with the given configuration.
     pub fn new(config: BrokerConfiguration) -> Self {
-        let (tx, mut rx) =
-            tokio::sync::mpsc::channel::<Request<ProduceRequest, ProduceResponse>>(100);
-
         let batch_coordinator_ref = config.batch_coordinator.clone();
         let object_store_ref = config.object_store.clone();
 
@@ -57,7 +55,7 @@ impl Broker {
         // Flusher task.
         tokio::task::spawn(async move {
             loop {
-                let timer = tokio::time::sleep(Duration::from_millis(config.flush_interval_in_ms)); // TODO: retrieve this from the configuration.
+                let timer = tokio::time::sleep(Duration::from_millis(config.flush_interval_in_ms));
 
                 // Await either a flush command or a timer expiry.
                 tokio::select! {
@@ -87,26 +85,10 @@ impl Broker {
             }
         });
 
-        // Accumulator task.
-        tokio::spawn(async move {
-            while let Some(req) = rx.recv().await {
-                tracing::info!("Received request: {:#?}", req);
-                let buffer_lock = cloned_buffer_ref.read().await;
-
-                let _ = buffer_lock.collect(req);
-
-                // TODO: This is currently hardcoded to 50kb, but we possibly want to make
-                if buffer_lock.size() > config.segment_size_in_bytes {
-                    let _ = flush_tx.send(()).await;
-                }
-            }
-
-            // TODO: what here if there is None?
-        });
-
         Self {
             config,
-            produce_request_tx: tx,
+            request_collection: cloned_buffer_ref,
+            flusher: flush_tx,
         }
     }
 
@@ -119,20 +101,30 @@ impl Broker {
     pub async fn produce(&mut self, request: ProduceRequest) -> RisklessResult<ProduceResponse> {
         tracing::info!("Producing Request {:#?}.", request);
 
-        let (request, response) = Request::new(request);
+        let (req, res) = Request::new(request);
 
-        // let (produce_response_tx, produce_response_rx) = tokio::sync::oneshot::channel();
+        let buffer_lock = self.request_collection.read().await;
 
-        self.produce_request_tx.send(request).await?;
+        let _ = buffer_lock.collect(req);
 
-        let message = response.recv().await?;
+        if buffer_lock.size() > self.config.segment_size_in_bytes {
+            let _ = self.flusher.send(()).await;
+        }
+
+        // Explicitly drop the lock here as we await the response.
+        drop(buffer_lock);
+
+        let message = res.recv().await?;
 
         Ok(message)
     }
 
     /// Handles a consume request by retrieving messages from object storage.
     #[tracing::instrument(skip_all, name = "consume")]
-    pub async fn consume(&self, request: ConsumeRequest) -> RisklessResult<ConsumeResponse> {
+    pub async fn consume(
+        &self,
+        request: ConsumeRequest,
+    ) -> RisklessResult<tokio::sync::mpsc::Receiver<ConsumeResponse>> {
         let batch_responses = self
             .config
             .batch_coordinator
@@ -152,14 +144,20 @@ impl Broker {
             .map(|batch_info| batch_info.object_key)
             .collect::<HashSet<_>>();
 
-        let result = objects_to_retrieve
-            .iter()
-            .map(|object_name| async {
-                let get_object_result = self
-                    .config
-                    .object_store
-                    .get(&Path::from(object_name.as_str()))
-                    .await;
+        // We create a
+        let (batch_response_tx, batch_reponse_rx) =
+            tokio::sync::mpsc::channel(objects_to_retrieve.len());
+
+        let batch_responses = Arc::new(batch_responses);
+
+        for object_name in objects_to_retrieve {
+            let batch_response_tx = batch_response_tx.clone();
+            let object_name = object_name.clone();
+            let object_store = self.config.object_store.clone();
+            let batch_responses = batch_responses.clone();
+
+            tokio::spawn(async move {
+                let get_object_result = object_store.get(&Path::from(object_name.as_str())).await;
 
                 let result = match get_object_result {
                     Ok(get_result) => {
@@ -175,31 +173,8 @@ impl Broker {
                                         .filter(|batch| batch.object_key == *object_name)
                                         .map(|batch| (res.clone(), batch))
                                 })
-                                .map(|(res, batch)| {
-                                    // index into the bytes.
-                                    let start: usize = (batch.metadata.base_offset
-                                        + batch.metadata.byte_offset)
-                                        .try_into()
-                                        .unwrap();
-                                    let end: usize = (batch.metadata.base_offset
-                                        + batch.metadata.byte_offset
-                                        + Into::<u64>::into(batch.metadata.byte_size))
-                                    .try_into()
-                                    .unwrap();
-
-                                    tracing::info!("START: {} END: {} ", start, end);
-
-                                    let data = b.slice(start..end);
-
-                                    let batch = ConsumeBatch {
-                                        topic: batch.metadata.topic_id_partition.0.clone(),
-                                        partition: batch.metadata.topic_id_partition.1,
-                                        offset: res.log_start_offset,
-                                        max_partition_fetch_bytes: 0,
-                                        data,
-                                    };
-
-                                    Some(batch)
+                                .filter_map(|(res, batch)| {
+                                    ConsumeBatch::try_from((res, batch, &b)).ok()
                                 })
                                 .collect::<Vec<_>>();
 
@@ -213,24 +188,19 @@ impl Broker {
                         vec![]
                     }
                 };
-                result
-            })
-            .collect::<Vec<_>>();
 
-        let mut consume_response = ConsumeResponse { batches: vec![] };
-
-        futures::future::join_all(result)
-            .await
-            .iter()
-            .for_each(|res| {
-                res.iter().for_each(|batch| {
-                    if let Some(b) = batch {
-                        consume_response.batches.push(b.clone());
-                    }
-                })
+                if !result.is_empty() {
+                    if let Err(e) = batch_response_tx
+                        .send(ConsumeResponse { batches: result })
+                        .await
+                    {
+                        tracing::error!("Failed to send consume response: {:#?}", e);
+                    };
+                };
             });
+        }
 
-        Ok(consume_response)
+        Ok(batch_reponse_rx)
     }
 }
 
