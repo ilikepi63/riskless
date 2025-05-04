@@ -1,4 +1,16 @@
-#[cfg(test)]
+
+
+/// Awaits all the data that a receiver sends and
+/// returns a vec with the buffered data.
+async fn await_all_receiver<T>(mut recv: tokio::sync::mpsc::Receiver<T>) -> Vec<T> {
+    let mut result = vec![];
+
+    while let Some(res) = recv.recv().await {
+        result.push(res);
+    }
+
+    result
+}#[cfg(test)]
 mod tests {
     use riskless::messages::consume_request::ConsumeRequest;
     use riskless::messages::produce_request::ProduceRequest;
@@ -7,6 +19,8 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
     use tracing_test::traced_test;
+
+    use crate::await_all_receiver;
 
     fn set_up_dirs() -> (PathBuf, PathBuf) {
         // UUIDs are used to ensure uniqueness. Note: this may make test a little flaky on chance of collision.
@@ -69,10 +83,11 @@ mod tests {
         assert!(consume_response.is_ok());
 
         let resp = consume_response.unwrap();
+        let batches = await_all_receiver(resp).await;
 
-        assert_eq!(resp.batches.len(), 1);
+        assert_eq!(batches.len(), 1);
         assert_eq!(
-            resp.batches.first().unwrap().data,
+            batches.first().unwrap().batches.first().unwrap().data,
             bytes::Bytes::from_static(b"hello")
         );
 
@@ -143,9 +158,12 @@ mod tests {
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             })
-            .await;
+            .await
+            .unwrap();
 
-        assert_eq!(consume_response.unwrap().batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
 
         let consume_response = broker
             .consume(ConsumeRequest {
@@ -157,9 +175,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(consume_response.batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
         assert_eq!(
-            consume_response.batches.first().unwrap().data,
+            consume_response
+                .first()
+                .unwrap()
+                .batches
+                .first()
+                .unwrap()
+                .data,
             bytes::Bytes::from_static(b"partition-two")
         );
 
@@ -173,9 +199,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(consume_response.batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
         assert_eq!(
-            consume_response.batches.first().unwrap().data,
+            consume_response
+                .first()
+                .unwrap()
+                .batches
+                .first()
+                .unwrap()
+                .data,
             bytes::Bytes::from_static(b"partition-three")
         );
 
@@ -259,9 +293,12 @@ mod tests {
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             })
-            .await;
+            .await
+            .unwrap();
 
-        assert_eq!(consume_response.unwrap().batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
 
         let consume_response = broker
             .consume(ConsumeRequest {
@@ -273,9 +310,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(consume_response.batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
         assert_eq!(
-            consume_response.batches.first().unwrap().data,
+            consume_response
+                .first()
+                .unwrap()
+                .batches
+                .first()
+                .unwrap()
+                .data,
             bytes::Bytes::from_static(b"partition-two")
         );
 
@@ -289,9 +334,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(consume_response.batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
         assert_eq!(
-            consume_response.batches.first().unwrap().data,
+            consume_response
+                .first()
+                .unwrap()
+                .batches
+                .first()
+                .unwrap()
+                .data,
             bytes::Bytes::from_static(b"partition-three")
         );
 
@@ -421,9 +474,11 @@ mod tests {
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             })
-            .await;
+            .await
+            .unwrap();
+        let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
 
         let consume_response = broker
             .consume(ConsumeRequest {
@@ -435,9 +490,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(consume_response.batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
         assert_eq!(
-            consume_response.batches.first().unwrap().data,
+            consume_response
+                .first()
+                .unwrap()
+                .batches
+                .first()
+                .unwrap()
+                .data,
             bytes::Bytes::from_static(b"example-topic-partition-one-first")
         );
 
@@ -451,9 +514,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(consume_response.batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
         assert_eq!(
-            consume_response.batches.first().unwrap().data,
+            consume_response
+                .first()
+                .unwrap()
+                .batches
+                .first()
+                .unwrap()
+                .data,
             bytes::Bytes::from_static(b"example-topic-partition-one-second")
         );
 
@@ -464,9 +535,12 @@ mod tests {
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             })
-            .await;
+            .await
+            .unwrap();
 
-        assert_eq!(consume_response.unwrap().batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
 
         let consume_response = broker
             .consume(ConsumeRequest {
@@ -478,9 +552,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(consume_response.batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
         assert_eq!(
-            consume_response.batches.first().unwrap().data,
+            consume_response
+                .first()
+                .unwrap()
+                .batches
+                .first()
+                .unwrap()
+                .data,
             bytes::Bytes::from_static(b"example-topic-two-partition-two-first")
         );
 
@@ -494,9 +576,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(consume_response.batches.len(), 1);
+        let consume_response = await_all_receiver(consume_response).await;
+
+        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
         assert_eq!(
-            consume_response.batches.first().unwrap().data,
+            consume_response
+                .first()
+                .unwrap()
+                .batches
+                .first()
+                .unwrap()
+                .data,
             bytes::Bytes::from_static(b"example-topic-two-partition-one-second")
         );
 
