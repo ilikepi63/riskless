@@ -55,6 +55,7 @@ let receiver = broker
     });
 
 let response = receiver.recv().await;    
+
 ```
 
 #### Implementation of BatchCoordinator
