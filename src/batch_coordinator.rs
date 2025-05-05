@@ -120,33 +120,33 @@ pub struct ListOffsetsRequest {
 
 #[derive(Debug)]
 pub struct ListOffsetsResponse {
-    errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
-    topic_id_partition: TopicIdPartition,
-    timestamp: u64,
-    offset: u64,
+    pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    pub topic_id_partition: TopicIdPartition,
+    pub timestamp: u64,
+    pub offset: u64,
 }
 
 #[derive(Debug)]
 pub struct DeleteRecordsRequest {
-    topic_id_partition: TopicIdPartition,
-    offset: u64,
+    pub topic_id_partition: TopicIdPartition,
+    pub offset: u64,
 }
 
 #[derive(Debug)]
 pub struct DeleteRecordsResponse {
-    errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
-    low_watermark: u64,
+    pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    pub low_watermark: u64,
 }
 
 #[derive(Debug)]
 pub struct FileToDelete {
-    object_key: String,
-    marked_for_deletion_at: SystemTime,
+    pub object_key: String,
+    pub marked_for_deletion_at: SystemTime,
 }
 
 #[derive(Debug)]
 pub struct DeleteFilesRequest {
-    object_key_paths: HashSet<String>,
+    pub object_key_paths: HashSet<String>,
 }
 
 #[async_trait::async_trait]
@@ -221,7 +221,7 @@ where
     ///
     /// # Errors
     /// Returns an error if an unexpected error occurs.
-    async fn delete_topics(&self, topic_ids: HashSet<uuid::Uuid>);
+    async fn delete_topics(&self, topic_ids: HashSet<String>);
 
     /// This operation allows a broker to get a list of soft deleted objects
     /// for asynchronous physical deletion from the object storage.

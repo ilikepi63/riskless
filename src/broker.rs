@@ -5,8 +5,10 @@ use object_store::{ObjectStore, PutPayload, path::Path};
 use tokio::sync::RwLock;
 
 use crate::{
-    batch_coordinator::{BatchCoordinator, FindBatchRequest, TopicIdPartition},
-    error::RisklessResult,
+    batch_coordinator::{
+        BatchCoordinator, FindBatchRequest, TopicIdPartition,
+    },
+    error::{RisklessError, RisklessResult},
     messages::{
         commit_batch_request::CommitBatchRequest,
         consume_request::ConsumeRequest,
@@ -117,6 +119,33 @@ impl Broker {
         let message = res.recv().await?;
 
         Ok(message)
+    }
+
+    /// Delete a specific record.
+    ///
+    /// Important to note that this undertakes a "soft" delete, which means that
+    /// the record still persists in object storage, but does not persist in the BatchCoordinator.
+    ///
+    /// The process to permanently delete files and records from the underlying object storage is done by a separate function.
+    #[tracing::instrument(skip_all, name = "delete_records")]
+    pub async fn delete_record(
+        &mut self,
+        request: crate::messages::delete_record_request::DeleteRecordsRequest,
+    ) -> RisklessResult<crate::messages::delete_record_response::DeleteRecordsResponse> {
+        let result = self
+            .config
+            .batch_coordinator
+            .delete_records(vec![request.try_into().map_err(|e| {
+                RisklessError::Generic(format!(
+                    "Failed to convert request into DeleteRecordsRequest with error {:#?}",
+                    e
+                ))
+            })?])
+            .await
+            .pop()
+            .ok_or(RisklessError::Unknown)?;
+
+        result.try_into()
     }
 
     /// Handles a consume request by retrieving messages from object storage.

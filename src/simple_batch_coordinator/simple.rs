@@ -241,27 +241,32 @@ impl BatchCoordinator for SimpleBatchCoordinator {
         todo!()
     }
 
+    /// Simply returns errors as this implementation does not support this operation.
     async fn delete_records(
         &self,
-        _requests: Vec<DeleteRecordsRequest>,
+        requests: Vec<DeleteRecordsRequest>,
     ) -> Vec<DeleteRecordsResponse> {
-        todo!()
+        requests
+            .iter()
+            .map(|_req| DeleteRecordsResponse {
+                errors: vec!["Coordinator does not support deleting records.".to_string()],
+                low_watermark: 1,
+            })
+            .collect::<Vec<_>>()
     }
+    /// No-op as this operation is not supported in the SimpleBatchCoordinator.
+    async fn delete_topics(&self, _topic_ids: HashSet<String>) {}
 
-    async fn delete_topics(&self, _topic_ids: HashSet<uuid::Uuid>) {
-        todo!()
-    }
-
+    /// Returns an empty vec as this operation is not supported in SimpleBatchCoordinator.
     async fn get_files_to_delete(&self) -> Vec<FileToDelete> {
-        todo!()
+        vec![]
     }
 
-    async fn delete_files(&self, _request: DeleteFilesRequest) {
-        todo!()
-    }
-
+    /// No-op as this operation is not supported in the SimpleBatchCoordinator.
+    async fn delete_files(&self, _request: DeleteFilesRequest) {}
+    /// Always returns false.
     async fn is_safe_to_delete_file(&self, _object_key: String) -> bool {
-        todo!()
+        false
     }
 }
 
@@ -450,9 +455,7 @@ mod tests {
 
         tracing::info!(
             "{:#?}",
-            std::fs::read_dir(&whole_dir)
-                .unwrap()
-                .collect::<Vec<_>>()
+            std::fs::read_dir(&whole_dir).unwrap().collect::<Vec<_>>()
         );
 
         // File should now exist
@@ -615,11 +618,7 @@ mod tests {
 
         index_path.push(&topic);
 
-        tracing::info!(
-            "{:#?}",
-            std::fs::read_dir(&index_path)?
-                .collect::<Vec<_>>()
-        );
+        tracing::info!("{:#?}", std::fs::read_dir(&index_path)?.collect::<Vec<_>>());
 
         index_path.push(format!("{:0>20}.index", partition.to_string()));
 
