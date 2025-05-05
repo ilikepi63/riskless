@@ -1,5 +1,3 @@
-
-
 /// Awaits all the data that a receiver sends and
 /// returns a vec with the buffered data.
 async fn await_all_receiver<T>(mut recv: tokio::sync::mpsc::Receiver<T>) -> Vec<T> {
@@ -10,8 +8,10 @@ async fn await_all_receiver<T>(mut recv: tokio::sync::mpsc::Receiver<T>) -> Vec<
     }
 
     result
-}#[cfg(test)]
+}
+#[cfg(test)]
 mod tests {
+    
     use riskless::messages::consume_request::ConsumeRequest;
     use riskless::messages::produce_request::ProduceRequest;
     use riskless::simple_batch_coordinator::SimpleBatchCoordinator;
@@ -590,6 +590,43 @@ mod tests {
             bytes::Bytes::from_static(b"example-topic-two-partition-one-second")
         );
 
+        tear_down_dirs(batch_coord_path, object_store_path);
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn can_request_deletion_of_records() {
+        let (batch_coord_path, object_store_path) = set_up_dirs();
+
+        let config = BrokerConfiguration {
+            object_store: Arc::new(
+                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            ),
+            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
+                batch_coord_path.to_string_lossy().to_string(),
+            )),
+            segment_size_in_bytes: 50_000,
+            flush_interval_in_ms: 500,
+        };
+
+        let mut broker = Broker::new(config);
+
+        let result = broker
+            .delete_record(
+                riskless::messages::delete_record_request::DeleteRecordsRequest {
+                    topic: "".to_string(),
+                    partition: 1,
+                    offset: 0,
+                },
+            )
+            .await;
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap();
+
+        // Not really ideal test scenarios.
+        assert_eq!(result.errors.len(), 1);
         tear_down_dirs(batch_coord_path, object_store_path);
     }
 }

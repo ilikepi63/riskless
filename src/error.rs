@@ -6,6 +6,9 @@ pub type RisklessResult<T> = Result<T, RisklessError>;
 
 #[derive(Error, Debug)]
 pub enum RisklessError {
+    /// Generic Error for arbitrary errors that are generally not classified but should still convey information.
+    #[error("{0}")]
+    Generic(String),
     #[error("unknown data store error")]
     Unknown,
 
