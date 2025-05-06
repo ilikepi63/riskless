@@ -27,6 +27,14 @@ pub enum RisklessError {
     TokioOneshotChannelRecvError(#[from] tokio::sync::oneshot::error::RecvError),
     #[error("Uuid Error")]
     UuidError(#[from] uuid::Error),
+
+    // SharedLogSegment Errors.
+    #[error("Invalid Magic Number: {0}")]
+    InvalidMagicNumberError(u32),
+    #[error("Unable to Parse Header: {0}")]
+    UnableToPassHeaderError(String),
+    #[error("Invalid Version Number: {0}")]
+    InvalidSharedLogSegmentVersionNumber(u32)
 }
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RisklessError {
