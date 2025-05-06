@@ -3,6 +3,8 @@
 
 #![allow(dead_code)]
 
+pub mod simple;
+
 use std::collections::HashSet;
 use std::vec::Vec;
 

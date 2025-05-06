@@ -6,8 +6,7 @@ pub mod batch_coordinator;
 mod utils;
 mod broker;
 pub mod messages;
-mod segment;
-pub mod simple_batch_coordinator;
+mod shared_log_segment;
 
 pub use broker::{Broker, BrokerConfiguration};
 pub mod error;
