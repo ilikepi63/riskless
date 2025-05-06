@@ -14,7 +14,7 @@ use crate::{
         produce_request::{ProduceRequest, ProduceRequestCollection},
         produce_response::ProduceResponse,
     },
-    segment::SharedLogSegment,
+    shared_log_segment::SharedLogSegment,
     utils::request_response::Request,
 };
 

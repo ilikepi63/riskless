@@ -12,9 +12,9 @@ async fn await_all_receiver<T>(mut recv: tokio::sync::mpsc::Receiver<T>) -> Vec<
 #[cfg(test)]
 mod tests {
 
+    use riskless::batch_coordinator::simple::SimpleBatchCoordinator;
     use riskless::messages::consume_request::ConsumeRequest;
     use riskless::messages::produce_request::ProduceRequest;
-    use riskless::simple_batch_coordinator::SimpleBatchCoordinator;
     use riskless::{Broker, BrokerConfiguration};
     use std::path::PathBuf;
     use std::sync::Arc;
