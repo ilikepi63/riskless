@@ -11,7 +11,7 @@ async fn await_all_receiver<T>(mut recv: tokio::sync::mpsc::Receiver<T>) -> Vec<
 }
 #[cfg(test)]
 mod tests {
-    
+
     use riskless::messages::consume_request::ConsumeRequest;
     use riskless::messages::produce_request::ProduceRequest;
     use riskless::simple_batch_coordinator::SimpleBatchCoordinator;
@@ -627,6 +627,29 @@ mod tests {
 
         // Not really ideal test scenarios.
         assert_eq!(result.errors.len(), 1);
+        tear_down_dirs(batch_coord_path, object_store_path);
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn can_delete_files_effectively() {
+        let (batch_coord_path, object_store_path) = set_up_dirs();
+
+        let config = BrokerConfiguration {
+            object_store: Arc::new(
+                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            ),
+            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
+                batch_coord_path.to_string_lossy().to_string(),
+            )),
+            segment_size_in_bytes: 50_000,
+            flush_interval_in_ms: 500,
+        };
+
+        let mut broker = Broker::new(config);
+
+        let _result = broker.heartbeat_permanent_delete().await.unwrap();
+
         tear_down_dirs(batch_coord_path, object_store_path);
     }
 }
