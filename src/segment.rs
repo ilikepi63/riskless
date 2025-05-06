@@ -1,9 +1,79 @@
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::{
     error::RisklessError,
     messages::{batch_coordinate::BatchCoordinate, produce_request::ProduceRequestCollection},
 };
+
+static MAGIC_NUMBER: u32 = 522;
+static V1_VERSION_NUMBER: u32 = 1;
+
+pub enum SharedLogSegmentHeader {
+    V1(SharedLogSegmentHeaderV1),
+}
+
+impl SharedLogSegmentHeader {
+    #[allow(unused)] 
+    pub fn size(&self) -> usize {
+        match self {
+            Self::V1(_) => SharedLogSegmentHeaderV1::size(),
+        }
+    }
+}
+
+impl TryFrom<Bytes> for SharedLogSegmentHeader {
+    type Error = RisklessError;
+
+    fn try_from(mut value: Bytes) -> Result<Self, Self::Error> {
+        let magic_number = value.try_get_u32().map_err(|err| {
+            RisklessError::UnableToPassHeaderError(format!(
+                "Failed to retrieve u32 from Header: {:#?}",
+                err
+            ))
+        })?;
+
+        if magic_number != MAGIC_NUMBER {
+            return Err(RisklessError::InvalidMagicNumberError(magic_number));
+        }
+
+        let version = value.try_get_u32().map_err(|err| {
+            RisklessError::UnableToPassHeaderError(format!(
+                "Failed to retrieve u32 from Header: {:#?}",
+                err
+            ))
+        })?;
+
+        match version {
+            1 => Ok(SharedLogSegmentHeader::V1(SharedLogSegmentHeaderV1)),
+            _ => Err(RisklessError::InvalidSharedLogSegmentVersionNumber(version)),
+        }
+    }
+}
+
+pub struct SharedLogSegmentHeaderV1;
+
+impl SharedLogSegmentHeaderV1 {
+    pub const fn version_number() -> u32 {
+        V1_VERSION_NUMBER
+    }
+
+    pub const fn magic_number() -> u32 {
+        MAGIC_NUMBER
+    }
+
+    pub const fn size() -> usize {
+        std::mem::size_of::<u32>() + std::mem::size_of::<u32>()
+    }
+
+    pub fn bytes() -> Bytes {
+        let mut bytes = BytesMut::new();
+
+        bytes.put_u32(Self::magic_number());
+        bytes.put_u32(Self::version_number());
+
+        bytes.into()
+    }
+}
 
 pub struct SharedLogSegment(Vec<BatchCoordinate>, BytesMut);
 
@@ -14,10 +84,12 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
     fn try_from(mut value: ProduceRequestCollection) -> Result<Self, Self::Error> {
         let mut buf = BytesMut::with_capacity(value.size().try_into()?);
 
+        buf.put_slice(&SharedLogSegmentHeaderV1::bytes());
+
         let mut batch_coords = Vec::with_capacity(value.iter_partitions().count()); // TODO: probably just get length here?
 
         // TODO: probably put some file  header stuff in here..
-        let base_offset = 0;
+        let base_offset = SharedLogSegmentHeaderV1::size().try_into()?;
 
         for partition in value.iter_partitions() {
             for req in partition.value() {
@@ -69,7 +141,7 @@ mod tests {
         assert!(result.is_ok());
         let segment = result.unwrap();
         assert_eq!(segment.0.len(), 0); // No batch coordinates
-        assert_eq!(segment.1.len(), 0); // Empty buffer
+        assert_eq!(segment.1.len(), SharedLogSegmentHeaderV1::size()); // Empty buffer
     }
 
     #[test]
@@ -91,15 +163,17 @@ mod tests {
         let segment = result.unwrap();
 
         assert_eq!(segment.0.len(), 1); // One batch coordinate
-        assert_eq!(segment.1.len(), 3); // 3 bytes of data
+        assert_eq!(segment.1.len(), SharedLogSegmentHeaderV1::size() + 3); // 3 bytes of data
 
         let coord = &segment.0[0];
         assert_eq!(coord.topic, "test");
         assert_eq!(coord.partition, 0);
-        assert_eq!(coord.base_offset, 0);
-        assert_eq!(coord.offset, 0); // buf.len() - 1 (3-1=2)
+        assert_eq!(coord.base_offset, SharedLogSegmentHeaderV1::size().try_into().unwrap());
+        assert_eq!(coord.offset, SharedLogSegmentHeaderV1::size().try_into().unwrap()); // buf.len() - 1 (3-1=2)
 
-        assert_eq!(segment.1.as_ref(), &[1, 2, 3]);
+        let expected_bytes = [SharedLogSegmentHeaderV1::bytes().iter().as_slice(), &[1,2,3]].concat();
+
+        assert_eq!(segment.1.as_ref(), &expected_bytes);
 
         Ok(())
     }
@@ -145,7 +219,7 @@ mod tests {
         let segment = result.unwrap();
 
         assert_eq!(segment.0.len(), 3); // Three batch coordinates
-        assert_eq!(segment.1.len(), 9); // 3 + 2 + 4 bytes of data
+        assert_eq!(segment.1.len(), 9 + SharedLogSegmentHeaderV1::size()); // 3 + 2 + 4 bytes of data
 
         // COMMENTED as ordering is not guaranteed.
         // Verify coordinates
@@ -170,7 +244,12 @@ mod tests {
     #[test]
     fn test_large_data_offsets() -> Result<(), Box<dyn std::error::Error>> {
         let collection = ProduceRequestCollection::new();
+
+        let header = SharedLogSegmentHeaderV1::bytes().to_vec();
+
         let large_data = vec![0; 10000];
+
+        let expected_large_data = [header, large_data.clone()].concat();
 
         let request = Request::new(ProduceRequest {
             request_id: 1,
@@ -185,11 +264,11 @@ mod tests {
         let segment = result.unwrap();
 
         assert_eq!(segment.0.len(), 1);
-        assert_eq!(segment.1.len(), 10000);
+        assert_eq!(segment.1.len(), 10000 + SharedLogSegmentHeaderV1::size());
 
         let coord = &segment.0[0];
-        assert_eq!(coord.offset, 0); // 10000 - 1
-        assert_eq!(segment.1.as_ref(), large_data.as_slice());
+        assert_eq!(coord.offset, SharedLogSegmentHeaderV1::size().try_into().unwrap()); // 10000 - 1
+        assert_eq!(segment.1.as_ref(), expected_large_data.as_slice());
 
         Ok(())
     }
