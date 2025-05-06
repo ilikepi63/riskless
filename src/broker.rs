@@ -5,9 +5,7 @@ use object_store::{ObjectStore, PutPayload, path::Path};
 use tokio::sync::RwLock;
 
 use crate::{
-    batch_coordinator::{
-        BatchCoordinator, FindBatchRequest, TopicIdPartition,
-    },
+    batch_coordinator::{BatchCoordinator, DeleteFilesRequest, FindBatchRequest, TopicIdPartition},
     error::{RisklessError, RisklessResult},
     messages::{
         commit_batch_request::CommitBatchRequest,
@@ -146,6 +144,50 @@ impl Broker {
             .ok_or(RisklessError::Unknown)?;
 
         result.try_into()
+    }
+
+    /// As Records become "soft" deleted over time, the underlying storage mechanism may
+    /// have clusters that do not have any references to live records after a certain amount of time.
+    ///
+    /// This will make the storage mechanism's collection ready for delete. This function effectively
+    /// queries the batch coordinator for objects that are ready for delete and then attempts to delete them.
+    ///
+    /// The interval at which this happens is delegated to the implementor.
+    #[tracing::instrument(skip_all, name = "heartbeat_permanent_delete")]
+    pub async fn heartbeat_permanent_delete(&mut self) -> RisklessResult<()> {
+        let batch_coordinator = self.config.batch_coordinator.clone();
+        let object_store = self.config.object_store.clone();
+
+        let files_to_delete = batch_coordinator.get_files_to_delete().await;
+
+        for file in files_to_delete {
+            let batch_coordinator = batch_coordinator.clone();
+            let object_store = object_store.clone();
+
+            tokio::spawn(async move {
+                let file_path = object_store::path::Path::from(file.object_key.as_ref());
+
+                let result = object_store.delete(&file_path).await;
+
+                match result {
+                    Ok(_) => {
+                        batch_coordinator
+                            .delete_files(DeleteFilesRequest {
+                                object_key_paths: HashSet::from([file.object_key]),
+                            })
+                            .await;
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            "Error occurred when trying to delete files in object store: {:#?}",
+                            err
+                        );
+                    }
+                }
+            });
+        }
+
+        Ok(())
     }
 
     /// Handles a consume request by retrieving messages from object storage.

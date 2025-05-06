@@ -264,6 +264,7 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
     /// No-op as this operation is not supported in the SimpleBatchCoordinator.
     async fn delete_files(&self, _request: DeleteFilesRequest) {}
+    
     /// Always returns false.
     async fn is_safe_to_delete_file(&self, _object_key: String) -> bool {
         false
