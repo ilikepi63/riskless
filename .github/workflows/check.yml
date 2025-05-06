@@ -19,6 +19,8 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
     steps:
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate code coverage
         run: cargo llvm-cov --all-features --workspace --codecov --output-path codecov.json
       - name: Upload coverage to Codecov
