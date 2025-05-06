@@ -648,7 +648,7 @@ mod tests {
 
         let mut broker = Broker::new(config);
 
-        let _result = broker.heartbeat_permanent_delete().await.unwrap();
+        broker.heartbeat_permanent_delete().await.unwrap();
 
         tear_down_dirs(batch_coord_path, object_store_path);
     }
