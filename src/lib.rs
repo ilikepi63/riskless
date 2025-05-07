@@ -1,6 +1,8 @@
 // #![deny(missing_docs)]
 #![deny(clippy::print_stdout)]
 #![deny(clippy::print_stderr)]
+#![deny(clippy::unwrap_used)]
+
 
 pub mod batch_coordinator;
 mod utils;
