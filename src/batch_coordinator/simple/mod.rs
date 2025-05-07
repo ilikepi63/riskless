@@ -180,15 +180,64 @@ impl BatchCoordinator for SimpleBatchCoordinator {
                 Ok(mut file) => {
                     tracing::info!("Reading from position: {:#?}", request.offset);
 
-                    let size_in_u64: u64 = Index::packed_size().try_into().unwrap();
+                    let size_in_u64: u64 = match Index::packed_size().try_into() {
+                        Ok(s) => s,
+                        Err(err) => {
+                            let message = format!(
+                                "Failed to convert Index size into u64 with error: {:#?}",
+                                err
+                            );
 
-                    let _result = file
-                        .seek(std::io::SeekFrom::Start(request.offset * size_in_u64))
-                        .unwrap();
+                            results.push(FindBatchResponse {
+                                errors: vec![err.to_string()],
+                                batches: vec![],
+                                log_start_offset: request.offset,
+                                high_watermark: 0,
+                            });
+
+                            tracing::error!(message);
+                            continue;
+                        }
+                    };
+
+                    // Seek to the desired offset in the file.
+                    match file.seek(std::io::SeekFrom::Start(request.offset * size_in_u64)) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            let message =
+                                format!("Failed to Seek in file with resultant error: {:#?}", err);
+
+                            results.push(FindBatchResponse {
+                                errors: vec![err.to_string()],
+                                batches: vec![],
+                                log_start_offset: request.offset,
+                                high_watermark: 0,
+                            });
+
+                            tracing::error!(message);
+                            continue;
+                        }
+                    };
 
                     let mut buf: [u8; 28] = [0; Index::packed_size()];
 
-                    file.read_exact(&mut buf).unwrap();
+                    match file.read_exact(&mut buf) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            let message =
+                                format!("Failed to read bytes from file with error: {:#?}", err);
+
+                            results.push(FindBatchResponse {
+                                errors: vec![err.to_string()],
+                                batches: vec![],
+                                log_start_offset: request.offset,
+                                high_watermark: 0,
+                            });
+
+                            tracing::error!(message);
+                            continue;
+                        }
+                    };
 
                     let index = Index::try_from(buf.as_ref());
 
