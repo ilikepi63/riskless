@@ -14,10 +14,12 @@ mod tests {
 
     use riskless::batch_coordinator::simple::SimpleBatchCoordinator;
     use riskless::messages::consume_request::ConsumeRequest;
-    use riskless::messages::produce_request::ProduceRequest;
-    use riskless::{Broker, BrokerConfiguration};
+    use riskless::messages::produce_request::{ProduceRequest, ProduceRequestCollection};
+    use riskless::{Broker, BrokerConfiguration, consume, flush, produce};
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::sync::RwLock;
     use tracing_test::traced_test;
 
     use crate::await_all_receiver;
@@ -42,43 +44,129 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
-    async fn can_produce_without_failure() {
+    async fn can_produce_without_failure_multitasked() {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
-        let config = BrokerConfiguration {
-            object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
-            ),
-            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.to_string_lossy().to_string(),
-            )),
-            segment_size_in_bytes: 50_000,
-            flush_interval_in_ms: 500,
-        };
+        let object_store = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+        );
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
 
-        let mut broker = Broker::new(config);
+        let col = Arc::new(RwLock::new(ProduceRequestCollection::new()));
 
-        let result = broker
-            .produce(ProduceRequest {
-                request_id: 1,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "hello".as_bytes().to_vec(),
-            })
+        let col_produce = col.clone();
+
+        let handle_one = tokio::spawn(async move {
+            let col_lock = col_produce.read().await;
+
+            let _ = produce(
+                &col_lock,
+                ProduceRequest {
+                    request_id: 1,
+                    topic: "example-topic".to_string(),
+                    partition: 1,
+                    data: "hello".as_bytes().to_vec(),
+                },
+            )
             .await
             .unwrap();
+        });
 
-        assert_eq!(result.request_id, 1);
-        assert_eq!(result.errors.len(), 0);
+        let col_flush = col.clone();
+        let flush_object_store_ref = object_store.clone();
+        let flush_batch_coord_ref = batch_coordinator.clone();
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let handle_two = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+
+            let mut col_lock = col_flush.write().await;
+
+            let mut new_ref = ProduceRequestCollection::new();
+
+            std::mem::swap(&mut *col_lock, &mut new_ref);
+
+            drop(col_lock); // Explicitly drop the lock.
+
+            let produce_response = flush(new_ref, flush_object_store_ref, flush_batch_coord_ref)
+                .await
+                .unwrap();
+
+            assert_eq!(produce_response.len(), 1);
+        });
+
+        let _ = tokio::join!(handle_one, handle_two);
+
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await;
+            },
+            object_store,
+            batch_coordinator,
+        )
+        .await;
+
+        assert!(consume_response.is_ok());
+
+        let resp = consume_response.unwrap();
+        let batches = await_all_receiver(resp).await;
+
+        assert_eq!(batches.len(), 1);
+        assert_eq!(
+            batches.first().unwrap().batches.first().unwrap().data,
+            bytes::Bytes::from_static(b"hello")
+        );
+
+        tear_down_dirs(batch_coord_path, object_store_path);
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn can_produce_without_failure() {
+        let (batch_coord_path, object_store_path) = set_up_dirs();
+
+        let object_store = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+        );
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
+
+        let col = ProduceRequestCollection::new();
+
+        let _ = produce(
+            &col,
+            ProduceRequest {
+                request_id: 1,
+                topic: "example-topic".to_string(),
+                partition: 1,
+                data: "hello".as_bytes().to_vec(),
+            },
+        )
+        .await
+        .unwrap();
+
+        let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(produce_response.len(), 1);
+
+        let consume_response = consume(
+            ConsumeRequest {
+                topic: "example-topic".to_string(),
+                partition: 1,
+                offset: 0,
+                max_partition_fetch_bytes: 0,
+            },
+            object_store,
+            batch_coordinator,
+        )
+        .await;
 
         assert!(consume_response.is_ok());
 

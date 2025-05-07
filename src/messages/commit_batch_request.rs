@@ -24,7 +24,7 @@ impl From<&BatchCoordinate> for CommitBatchRequest {
     fn from(value: &BatchCoordinate) -> Self {
         // Everything that is defaulted is unknown for now.
         CommitBatchRequest {
-            request_id: value.request.request_id, 
+            request_id: value.request.request_id,
             topic_id_partition: TopicIdPartition(value.topic.clone(), value.partition),
             byte_offset: value.offset,
             size: value.size,

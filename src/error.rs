@@ -34,7 +34,7 @@ pub enum RisklessError {
     #[error("Unable to Parse Header: {0}")]
     UnableToPassHeaderError(String),
     #[error("Invalid Version Number: {0}")]
-    InvalidSharedLogSegmentVersionNumber(u32)
+    InvalidSharedLogSegmentVersionNumber(u32),
 }
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RisklessError {

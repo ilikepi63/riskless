@@ -23,9 +23,9 @@ pub struct ProduceRequest {
 
 #[derive(Debug)]
 pub struct ProduceRequestCollection {
-    inner: DashMap<TopicIdPartition, Vec<ProduceRequest>>,
-    response_senders: DashMap<u32, Request<ProduceRequest, ProduceResponse>>,
-    size: AtomicU64,
+    pub inner: DashMap<TopicIdPartition, Vec<ProduceRequest>>,
+    pub response_senders: DashMap<u32, Request<ProduceRequest, ProduceResponse>>,
+    pub size: AtomicU64,
 }
 
 impl Default for ProduceRequestCollection {

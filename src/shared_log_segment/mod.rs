@@ -13,7 +13,7 @@ pub enum SharedLogSegmentHeader {
 }
 
 impl SharedLogSegmentHeader {
-    #[allow(unused)] 
+    #[allow(unused)]
     pub fn size(&self) -> usize {
         match self {
             Self::V1(_) => SharedLogSegmentHeaderV1::size(),
@@ -168,10 +168,20 @@ mod tests {
         let coord = &segment.0[0];
         assert_eq!(coord.topic, "test");
         assert_eq!(coord.partition, 0);
-        assert_eq!(coord.base_offset, SharedLogSegmentHeaderV1::size().try_into().unwrap());
-        assert_eq!(coord.offset, SharedLogSegmentHeaderV1::size().try_into().unwrap()); // buf.len() - 1 (3-1=2)
+        assert_eq!(
+            coord.base_offset,
+            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+        );
+        assert_eq!(
+            coord.offset,
+            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+        ); // buf.len() - 1 (3-1=2)
 
-        let expected_bytes = [SharedLogSegmentHeaderV1::bytes().iter().as_slice(), &[1,2,3]].concat();
+        let expected_bytes = [
+            SharedLogSegmentHeaderV1::bytes().iter().as_slice(),
+            &[1, 2, 3],
+        ]
+        .concat();
 
         assert_eq!(segment.1.as_ref(), &expected_bytes);
 
@@ -267,7 +277,10 @@ mod tests {
         assert_eq!(segment.1.len(), 10000 + SharedLogSegmentHeaderV1::size());
 
         let coord = &segment.0[0];
-        assert_eq!(coord.offset, SharedLogSegmentHeaderV1::size().try_into().unwrap()); // 10000 - 1
+        assert_eq!(
+            coord.offset,
+            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+        ); // 10000 - 1
         assert_eq!(segment.1.as_ref(), expected_large_data.as_slice());
 
         Ok(())

@@ -1,4 +1,7 @@
-use crate::{ batch_coordinator::{FindBatchRequest, TopicIdPartition}, error::RisklessError};
+use crate::{
+    batch_coordinator::{FindBatchRequest, TopicIdPartition},
+    error::RisklessError,
+};
 
 #[derive(Debug)]
 pub struct ConsumeRequest {
@@ -12,12 +15,10 @@ impl TryInto<FindBatchRequest> for ConsumeRequest {
     type Error = RisklessError;
 
     fn try_into(self) -> Result<FindBatchRequest, Self::Error> {
-
-        Ok(FindBatchRequest{
+        Ok(FindBatchRequest {
             topic_id_partition: TopicIdPartition(self.topic, self.partition),
             offset: self.offset,
             max_partition_fetch_bytes: 0,
         })
-
     }
 }
