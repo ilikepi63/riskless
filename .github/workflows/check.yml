@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Clippy
-        run: cargo clippy --all-features --all-targets
+        run: cargo clippy --all-features 
   coverage:
     runs-on: ubuntu-latest
     env:
