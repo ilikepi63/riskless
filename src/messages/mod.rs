@@ -1,8 +1,19 @@
-pub mod batch_coordinate;
-pub mod commit_batch_request;
-pub mod consume_request;
-pub mod consume_response;
-pub mod delete_record_request;
-pub mod delete_record_response;
-pub mod produce_request;
-pub mod produce_response;
+//! General data structures for communicating data.
+
+mod batch_coordinate;
+mod commit_batch_request;
+mod consume_request;
+mod consume_response;
+mod delete_record_request;
+mod delete_record_response;
+mod produce_request;
+mod produce_response;
+
+pub use batch_coordinate::*;
+pub use commit_batch_request::*;
+pub use consume_request::*;
+pub use consume_response::*;
+pub use delete_record_request::*;
+pub use delete_record_response::*;
+pub use produce_request::*;
+pub use produce_response::*;

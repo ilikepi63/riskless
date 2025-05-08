@@ -10,75 +10,119 @@ use std::vec::Vec;
 
 use std::time::SystemTime;
 
-use crate::messages::commit_batch_request::CommitBatchRequest;
+use crate::messages::CommitBatchRequest;
 
+/// Merged Topic/Partition identification struc .
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
 pub struct TopicIdPartition(pub String, pub u64);
 
+/// The type of the timestamp given.
 #[derive(Debug, Default, Clone)]
 pub enum TimestampType {
+    /// Default implementation.
     #[default]
     Dummy,
 }
 
+/// Request parameter to create a topic/partition combination.
 #[derive(Debug)]
 pub struct CreateTopicAndPartitionsRequest {
+    /// The ID of the topic.
     pub topic_id: uuid::Uuid,
+    /// The name of the topic.
     pub topic_name: String,
+    /// How many partitions this topic should have.
     pub num_partitions: u32,
 }
 
+/// Response for CommitBatchRequest in order to commit a batch.
 #[derive(Debug)]
 pub struct CommitBatchResponse {
+    /// The errors from this request.
     pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    /// Unknown.
     pub assigned_base_offset: u64,
+    /// Unknown.
     pub log_append_time: u64,
+    /// Unknown.
     pub log_start_offset: u64,
+    /// Unknown.
     pub is_duplicate: bool,
+    /// Unknown.
     pub request: CommitBatchRequest,
 }
 
+/// Request parameter for finding a specific offset in a topic/partiton.
 #[derive(Debug)]
 pub struct FindBatchRequest {
+    /// ID of the topic/partition combination.
     pub topic_id_partition: TopicIdPartition,
+    /// The offset of the requested record.
     pub offset: u64,
+    /// How many bytes is the max that this response can hold.
     pub max_partition_fetch_bytes: u32,
 }
 
+/// The Response struct for the FindBatchRequest.
 #[derive(Debug, Clone)]
 pub struct FindBatchResponse {
+    /// The errors from this request.
     pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    /// The batches that were fetched using this response.
     pub batches: Vec<BatchInfo>,
+    /// Unknown.
     pub log_start_offset: u64,
+    /// Unknown.
     pub high_watermark: u64,
 }
 
+/// Information regarding where a batch is, specifically
+/// which object_key and which offset the batch is at.
 #[derive(Debug, Clone)]
 pub struct BatchInfo {
+    /// ID of this batch.
     pub batch_id: u64,
+    /// The object key for where this resides.
     pub object_key: String,
+    /// The metadata for this batch.
     pub metadata: BatchMetadata,
 }
 
+/// Metadata Information for a BatchInfo struct.
 #[derive(Debug, Default, Clone)]
 pub struct BatchMetadata {
+    /// The topic/partition this batch belongs to.
     pub topic_id_partition: TopicIdPartition,
+    /// The byte offset within the segment file for this batch.
     pub byte_offset: u64,
+    /// The size in bytes of the record batch.
     pub byte_size: u32,
+    /// The base offset of the offset for this batch.
     pub base_offset: u64,
+    /// The last offset for this specific batch.
     pub last_offset: u64,
+    /// The timestamp of when this batch was appended to the log.
     pub log_append_timestamp: u64,
+    /// The max timestamp for this batch.
     pub batch_max_timestamp: u64,
+    /// The timestamp type that the preceding timestamps adhere to.
     pub timestamp_type: TimestampType,
+    /// The ID identifying the producer that produced this batch.
     pub producer_id: u64,
+    /// The epoch of the producer.
     pub producer_epoch: i16,
+    /// Unknown.
     pub base_sequence: u32,
+    /// Unknown.
     pub last_sequence: u32,
 }
 
+/// The request to list the offsets of a topic/partition combination.
 #[derive(Debug)]
 pub struct ListOffsetsRequest {
+    /// The topic/partition combination.
     pub topic_id_partition: TopicIdPartition,
+    /// The given timestamp of the request.
     pub timestamp: u64,
 }
 
@@ -120,37 +164,59 @@ pub struct ListOffsetsRequest {
 //         .LATEST_TIERED_TIMESTAMP;
 // }
 
+/// The response for a ListOffsetsRequest.
 #[derive(Debug)]
 pub struct ListOffsetsResponse {
+    /// The errors from this request.
     pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    /// The topic/partition combination.
     pub topic_id_partition: TopicIdPartition,
+    /// The given timestamp of the request.
     pub timestamp: u64,
+    /// The given offset of the topic/partition combination.
     pub offset: u64,
 }
 
+/// Request to delete a record.
 #[derive(Debug)]
 pub struct DeleteRecordsRequest {
+    /// The topic/partition combination.
     pub topic_id_partition: TopicIdPartition,
+    /// The offset for the record that will be deleted.
     pub offset: u64,
 }
 
+/// A response for a DeleteRecordsRequest.
 #[derive(Debug)]
 pub struct DeleteRecordsResponse {
+    /// The errors from this request.
     pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    /// Unknown.
     pub low_watermark: u64,
 }
 
+/// A File that is able to be deleted as it has been
+/// soft deleted by the BatchCoordinator.
 #[derive(Debug)]
 pub struct FileToDelete {
+    /// The object key for the file.
     pub object_key: String,
+    /// The system timestamp for when the file was marked for deletion.
     pub marked_for_deletion_at: SystemTime,
 }
 
+/// A request that tells the BatchCoordinator that the set of files
+/// have been deleted and therefore can be marked as permanently deleted.
 #[derive(Debug)]
 pub struct DeleteFilesRequest {
+    /// Set of files to be deleted.
     pub object_key_paths: HashSet<String>,
 }
 
+/// The BatchCoordinator trait.
+///
+/// This structure is responsible for handling the indexing of offsets within topic's partitions.
+/// It is designed to be reimplementable for custom usecases depending on what the specific need is.
 #[async_trait::async_trait]
 pub trait BatchCoordinator
 where
@@ -240,5 +306,7 @@ where
     /// Returns an error if an unexpected error occurs.
     async fn delete_files(&self, request: DeleteFilesRequest);
 
+    /// Determines whether or not the given file with a specific object key
+    /// is safe for permanent deletion.
     async fn is_safe_to_delete_file(&self, object_key: String) -> bool;
 }

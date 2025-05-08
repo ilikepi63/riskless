@@ -1,27 +1,30 @@
-// use std::collections::{
-//     HashMap,
-//     hash_map::{Entry, Values},
-// };
-
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use dashmap::{DashMap, Entry, iter::IterMut};
 
-use crate::{
-    batch_coordinator::TopicIdPartition, error::RisklessResult,
-};
+use crate::{batch_coordinator::TopicIdPartition, error::RisklessResult};
 
+/// A Request representing the intention to produce a record on a topic/partition.
 #[derive(Debug, Clone)]
 pub struct ProduceRequest {
+    /// Unique ID for this request.
     pub request_id: u32,
+    /// The topic to which this data will be produced.
     pub topic: String,
+    /// The partition on which this data will be produced.
     pub partition: u64,
+    /// The data that will be added to the partition.
     pub data: Vec<u8>,
 }
 
+/// A collection of ProduceRequests.
+///
+///  This is primarily used to be converted into a SharedLogSegment.
 #[derive(Debug)]
 pub struct ProduceRequestCollection {
+    /// A concurrent data structure for handling produce requests for each topic/partition combination.
     pub inner: DashMap<TopicIdPartition, Vec<ProduceRequest>>,
+    /// The size in bytes for this collection.
     pub size: AtomicU64,
 }
 
@@ -32,6 +35,7 @@ impl Default for ProduceRequestCollection {
 }
 
 impl ProduceRequestCollection {
+    /// Create a new intance of this struct.
     pub fn new() -> Self {
         Self {
             inner: DashMap::new(),
@@ -39,11 +43,13 @@ impl ProduceRequestCollection {
         }
     }
 
+    /// Clear this struct.
     pub fn clear(&mut self) {
         self.inner.clear();
         self.size = AtomicU64::new(0);
     }
 
+    /// Collect a produce request into this struct.
     pub fn collect(&self, req: ProduceRequest) -> RisklessResult<()> {
         tracing::info!("Collecting: {:#?}", req);
 
@@ -67,10 +73,12 @@ impl ProduceRequestCollection {
         Ok(())
     }
 
+    /// Get the size in bytes for this collection.
     pub fn size(&self) -> u64 {
         self.size.load(Ordering::Relaxed)
     }
 
+    /// Iterate over the partitions of this structure.
     pub fn iter_partitions(&mut self) -> IterMut<'_, TopicIdPartition, Vec<ProduceRequest>> {
         self.inner.iter_mut()
     }

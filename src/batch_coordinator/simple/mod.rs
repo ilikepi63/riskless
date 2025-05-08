@@ -1,3 +1,4 @@
+//! Simple Implementation of a BatchCoordinator.
 mod index;
 
 use index::Index;
@@ -11,10 +12,7 @@ use std::{
 use bytes::BytesMut;
 use uuid::Uuid;
 
-use crate::{
-    batch_coordinator::BatchInfo, error::RisklessResult,
-    messages::commit_batch_request::CommitBatchRequest,
-};
+use crate::{batch_coordinator::BatchInfo, error::RisklessResult, messages::CommitBatchRequest};
 
 use crate::batch_coordinator::{
     BatchCoordinator, BatchMetadata, CommitBatchResponse, CreateTopicAndPartitionsRequest,
@@ -22,19 +20,26 @@ use crate::batch_coordinator::{
     FindBatchRequest, FindBatchResponse, ListOffsetsRequest, ListOffsetsResponse,
 };
 
+/// The SimpleBatchCoordinator is a default implementation that is
+///
+/// - Single Node
+/// - Based to a very less extent on Kafka's segment file implementation.
 #[derive(Debug)]
 pub struct SimpleBatchCoordinator {
     directory: PathBuf,
 }
 
 impl SimpleBatchCoordinator {
+    /// Creates a new instance of this struct.
     pub fn new(directory: String) -> Self {
         Self {
             directory: PathBuf::from(directory),
         }
     }
 
-    /// Has the necessary side effect making certain this is a directory that exists.
+    /// Retrieves the current topic directory of this Coordinator.
+    ///
+    /// Side effect: if the topic directory does not exist, this simply creates it.
     fn topic_dir(&self, topic: String) -> PathBuf {
         let mut current_topic_dir = self.directory.clone();
         current_topic_dir.push(topic);
@@ -48,6 +53,7 @@ impl SimpleBatchCoordinator {
         }
     }
 
+    /// Retrieves the directory of the given topic/partition.
     fn partition_index_file_from_topic_dir(
         topic_dir: &mut PathBuf,
         partition: u64,
@@ -57,7 +63,7 @@ impl SimpleBatchCoordinator {
         (topic_dir) as _
     }
 
-    // I think you might be able to do this with the File API?
+    /// Opens or creates the underlying file depending on it's existence.
     fn open_or_create_file(current_partition_file: &PathBuf) -> RisklessResult<File> {
         tracing::info!("File {:#?} exists.", current_partition_file);
 
@@ -80,6 +86,7 @@ impl SimpleBatchCoordinator {
         Ok(file?)
     }
 
+    /// Simply opens a given file.
     fn open_file(current_partition_file: &PathBuf) -> RisklessResult<File> {
         let file = std::fs::File::open(current_partition_file)?;
 

@@ -1,9 +1,13 @@
 use crate::{batch_coordinator::TopicIdPartition, error::RisklessError};
 
+/// A request that represents the intention to delete a record at a specified offset.
 #[derive(Debug)]
 pub struct DeleteRecordsRequest {
+    /// The topic of the record.
     pub topic: String,
+    /// Partition of a record.
     pub partition: u64,
+    /// The offset of this record.
     pub offset: u64,
 }
 

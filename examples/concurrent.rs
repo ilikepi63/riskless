@@ -3,10 +3,7 @@ use std::{sync::Arc, time::Duration};
 use riskless::{
     batch_coordinator::simple::SimpleBatchCoordinator,
     consume, flush,
-    messages::{
-        consume_request::ConsumeRequest,
-        produce_request::{ProduceRequest, ProduceRequestCollection},
-    },
+    messages::{ConsumeRequest, ProduceRequest, ProduceRequestCollection},
     produce,
 };
 use tokio::sync::RwLock;
