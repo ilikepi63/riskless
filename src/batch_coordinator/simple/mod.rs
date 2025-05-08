@@ -1,4 +1,4 @@
-//! Simple Implementation of a BatchCoordinator. 
+//! Simple Implementation of a BatchCoordinator.
 mod index;
 
 use index::Index;
@@ -12,10 +12,7 @@ use std::{
 use bytes::BytesMut;
 use uuid::Uuid;
 
-use crate::{
-    batch_coordinator::BatchInfo, error::RisklessResult,
-    messages::CommitBatchRequest,
-};
+use crate::{batch_coordinator::BatchInfo, error::RisklessResult, messages::CommitBatchRequest};
 
 use crate::batch_coordinator::{
     BatchCoordinator, BatchMetadata, CommitBatchResponse, CreateTopicAndPartitionsRequest,
@@ -23,8 +20,8 @@ use crate::batch_coordinator::{
     FindBatchRequest, FindBatchResponse, ListOffsetsRequest, ListOffsetsResponse,
 };
 
-/// The SimpleBatchCoordinator is a default implementation that is 
-/// 
+/// The SimpleBatchCoordinator is a default implementation that is
+///
 /// - Single Node
 /// - Based to a very less extent on Kafka's segment file implementation.
 #[derive(Debug)]
@@ -40,8 +37,8 @@ impl SimpleBatchCoordinator {
         }
     }
 
-    /// Retrieves the current topic directory of this Coordinator. 
-    /// 
+    /// Retrieves the current topic directory of this Coordinator.
+    ///
     /// Side effect: if the topic directory does not exist, this simply creates it.
     fn topic_dir(&self, topic: String) -> PathBuf {
         let mut current_topic_dir = self.directory.clone();

@@ -148,14 +148,12 @@ mod tests {
     fn test_single_partition_single_request() -> Result<(), Box<dyn std::error::Error>> {
         let collection = ProduceRequestCollection::new();
 
-        collection.collect(
-            ProduceRequest {
-                request_id: 1,
-                topic: "test".to_string(),
-                partition: 0,
-                data: vec![1, 2, 3],
-            },
-        )?;
+        collection.collect(ProduceRequest {
+            request_id: 1,
+            topic: "test".to_string(),
+            partition: 0,
+            data: vec![1, 2, 3],
+        })?;
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());
@@ -192,33 +190,27 @@ mod tests {
         let collection = ProduceRequestCollection::new();
 
         // Partition 0
-        collection.collect(
-            ProduceRequest {
-                request_id: 1,
-                topic: "test".to_string(),
-                partition: 0,
-                data: vec![1, 2, 3],
-            },
-        )?;
+        collection.collect(ProduceRequest {
+            request_id: 1,
+            topic: "test".to_string(),
+            partition: 0,
+            data: vec![1, 2, 3],
+        })?;
 
-        collection.collect(
-            ProduceRequest {
-                request_id: 2,
-                topic: "test".to_string(),
-                partition: 0,
-                data: vec![4, 5],
-            },
-        )?;
+        collection.collect(ProduceRequest {
+            request_id: 2,
+            topic: "test".to_string(),
+            partition: 0,
+            data: vec![4, 5],
+        })?;
 
         // Partition 1
-        collection.collect(
-            ProduceRequest {
-                request_id: 3,
-                topic: "test".to_string(),
-                partition: 1,
-                data: vec![6, 7, 8, 9],
-            },
-        )?;
+        collection.collect(ProduceRequest {
+            request_id: 3,
+            topic: "test".to_string(),
+            partition: 1,
+            data: vec![6, 7, 8, 9],
+        })?;
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());

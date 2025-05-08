@@ -13,7 +13,7 @@ pub enum RisklessError {
     #[error("{0}")]
     Generic(String),
     /// Unknown Error emitted when the outcome made an error that is generally unknown.
-    /// Important to note that use of this error is discouraged and will be removed in the future. 
+    /// Important to note that use of this error is discouraged and will be removed in the future.
     #[error("Unknown Riskless Error")]
     Unknown,
 
@@ -41,8 +41,8 @@ pub enum RisklessError {
     UuidError(#[from] uuid::Error),
 
     // SharedLogSegment Errors.
-    /// This error is emitted when trying to parse a SharedLogSegment file and the underlying file does not 
-    /// have the expected magic number. 
+    /// This error is emitted when trying to parse a SharedLogSegment file and the underlying file does not
+    /// have the expected magic number.
     #[error("Invalid Magic Number: {0}")]
     InvalidMagicNumberError(u32),
     #[error("Unable to Parse Header: {0}")]

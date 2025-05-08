@@ -17,8 +17,8 @@ pub struct ProduceRequest {
     pub data: Vec<u8>,
 }
 
-/// A collection of ProduceRequests. 
-/// 
+/// A collection of ProduceRequests.
+///
 ///  This is primarily used to be converted into a SharedLogSegment.
 #[derive(Debug)]
 pub struct ProduceRequestCollection {
@@ -35,7 +35,6 @@ impl Default for ProduceRequestCollection {
 }
 
 impl ProduceRequestCollection {
-
     /// Create a new intance of this struct.
     pub fn new() -> Self {
         Self {

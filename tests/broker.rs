@@ -15,10 +15,7 @@ mod tests {
     use riskless::batch_coordinator::simple::SimpleBatchCoordinator;
     use riskless::messages::ConsumeRequest;
     use riskless::messages::{ProduceRequest, ProduceRequestCollection};
-    use riskless::{
-        consume, delete_record, flush, produce,
-        scan_and_permanently_delete_records,
-    };
+    use riskless::{consume, delete_record, flush, produce, scan_and_permanently_delete_records};
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::Duration;
@@ -550,7 +547,8 @@ mod tests {
                 data: "hello".as_bytes().to_vec(),
             },
         )
-        .await.unwrap();
+        .await
+        .unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await

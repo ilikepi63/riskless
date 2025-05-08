@@ -195,7 +195,7 @@ pub struct DeleteRecordsResponse {
     pub low_watermark: u64,
 }
 
-/// A File that is able to be deleted as it has been 
+/// A File that is able to be deleted as it has been
 /// soft deleted by the BatchCoordinator.
 #[derive(Debug)]
 pub struct FileToDelete {
@@ -213,9 +213,8 @@ pub struct DeleteFilesRequest {
     pub object_key_paths: HashSet<String>,
 }
 
-
-/// The BatchCoordinator trait. 
-/// 
+/// The BatchCoordinator trait.
+///
 /// This structure is responsible for handling the indexing of offsets within topic's partitions.
 /// It is designed to be reimplementable for custom usecases depending on what the specific need is.
 #[async_trait::async_trait]

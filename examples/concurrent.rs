@@ -3,10 +3,7 @@ use std::{sync::Arc, time::Duration};
 use riskless::{
     batch_coordinator::simple::SimpleBatchCoordinator,
     consume, flush,
-    messages::{
-        ConsumeRequest,
-        ProduceRequest, ProduceRequestCollection,
-    },
+    messages::{ConsumeRequest, ProduceRequest, ProduceRequestCollection},
     produce,
 };
 use tokio::sync::RwLock;
@@ -75,9 +72,7 @@ async fn main() {
 
     assert!(consume_response.is_ok());
 
-    let mut 
-    
-    resp = consume_response.unwrap();
+    let mut resp = consume_response.unwrap();
     let batch = resp.recv().await;
 
     println!("Batch: {:#?}", batch);

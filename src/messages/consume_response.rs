@@ -13,7 +13,7 @@ pub struct ConsumeBatch {
     /// Partition of a record.
     pub partition: u64,
     /// The offset of this record.
-        pub offset: u64,
+    pub offset: u64,
     /// The maximum amount of bytes to retrieve from each partition.
     pub max_partition_fetch_bytes: u32,
     /// The bytes retrieved.

@@ -1,4 +1,3 @@
-
 use crate::batch_coordinator::CommitBatchResponse;
 
 /// A response representing the outcome of a ProduceRequest.
