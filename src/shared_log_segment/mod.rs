@@ -13,7 +13,7 @@ pub enum SharedLogSegmentHeader {
 }
 
 impl SharedLogSegmentHeader {
-    #[allow(unused)] 
+    #[allow(unused)]
     pub fn size(&self) -> usize {
         match self {
             Self::V1(_) => SharedLogSegmentHeaderV1::size(),
@@ -129,7 +129,7 @@ impl From<SharedLogSegment> for bytes::Bytes {
 
 #[cfg(test)]
 mod tests {
-    use crate::{messages::produce_request::ProduceRequest, utils::request_response::Request};
+    use crate::messages::produce_request::ProduceRequest;
 
     use super::*;
     use std::convert::TryFrom;
@@ -149,13 +149,12 @@ mod tests {
         let collection = ProduceRequestCollection::new();
 
         collection.collect(
-            Request::new(ProduceRequest {
+            ProduceRequest {
                 request_id: 1,
                 topic: "test".to_string(),
                 partition: 0,
                 data: vec![1, 2, 3],
-            })
-            .0,
+            },
         )?;
 
         let result = SharedLogSegment::try_from(collection);
@@ -168,10 +167,20 @@ mod tests {
         let coord = &segment.0[0];
         assert_eq!(coord.topic, "test");
         assert_eq!(coord.partition, 0);
-        assert_eq!(coord.base_offset, SharedLogSegmentHeaderV1::size().try_into().unwrap());
-        assert_eq!(coord.offset, SharedLogSegmentHeaderV1::size().try_into().unwrap()); // buf.len() - 1 (3-1=2)
+        assert_eq!(
+            coord.base_offset,
+            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+        );
+        assert_eq!(
+            coord.offset,
+            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+        ); // buf.len() - 1 (3-1=2)
 
-        let expected_bytes = [SharedLogSegmentHeaderV1::bytes().iter().as_slice(), &[1,2,3]].concat();
+        let expected_bytes = [
+            SharedLogSegmentHeaderV1::bytes().iter().as_slice(),
+            &[1, 2, 3],
+        ]
+        .concat();
 
         assert_eq!(segment.1.as_ref(), &expected_bytes);
 
@@ -184,34 +193,31 @@ mod tests {
 
         // Partition 0
         collection.collect(
-            Request::new(ProduceRequest {
+            ProduceRequest {
                 request_id: 1,
                 topic: "test".to_string(),
                 partition: 0,
                 data: vec![1, 2, 3],
-            })
-            .0,
+            },
         )?;
 
         collection.collect(
-            Request::new(ProduceRequest {
+            ProduceRequest {
                 request_id: 2,
                 topic: "test".to_string(),
                 partition: 0,
                 data: vec![4, 5],
-            })
-            .0,
+            },
         )?;
 
         // Partition 1
         collection.collect(
-            Request::new(ProduceRequest {
+            ProduceRequest {
                 request_id: 3,
                 topic: "test".to_string(),
                 partition: 1,
                 data: vec![6, 7, 8, 9],
-            })
-            .0,
+            },
         )?;
 
         let result = SharedLogSegment::try_from(collection);
@@ -251,13 +257,13 @@ mod tests {
 
         let expected_large_data = [header, large_data.clone()].concat();
 
-        let request = Request::new(ProduceRequest {
+        let request = ProduceRequest {
             request_id: 1,
             topic: "large".to_string(),
             partition: 0,
             data: large_data.clone(),
-        });
-        collection.collect(request.0)?;
+        };
+        collection.collect(request)?;
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());
@@ -267,7 +273,10 @@ mod tests {
         assert_eq!(segment.1.len(), 10000 + SharedLogSegmentHeaderV1::size());
 
         let coord = &segment.0[0];
-        assert_eq!(coord.offset, SharedLogSegmentHeaderV1::size().try_into().unwrap()); // 10000 - 1
+        assert_eq!(
+            coord.offset,
+            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+        ); // 10000 - 1
         assert_eq!(segment.1.as_ref(), expected_large_data.as_slice());
 
         Ok(())

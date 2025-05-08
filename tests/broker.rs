@@ -14,10 +14,15 @@ mod tests {
 
     use riskless::batch_coordinator::simple::SimpleBatchCoordinator;
     use riskless::messages::consume_request::ConsumeRequest;
-    use riskless::messages::produce_request::ProduceRequest;
-    use riskless::{Broker, BrokerConfiguration};
+    use riskless::messages::produce_request::{ProduceRequest, ProduceRequestCollection};
+    use riskless::{
+        consume, delete_record, flush, produce,
+        scan_and_permanently_delete_records,
+    };
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::sync::RwLock;
     use tracing_test::traced_test;
 
     use crate::await_all_receiver;
@@ -42,43 +47,129 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
-    async fn can_produce_without_failure() {
+    async fn can_produce_without_failure_multitasked() {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
-        let config = BrokerConfiguration {
-            object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
-            ),
-            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.to_string_lossy().to_string(),
-            )),
-            segment_size_in_bytes: 50_000,
-            flush_interval_in_ms: 500,
-        };
+        let object_store = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+        );
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
 
-        let mut broker = Broker::new(config);
+        let col = Arc::new(RwLock::new(ProduceRequestCollection::new()));
 
-        let result = broker
-            .produce(ProduceRequest {
-                request_id: 1,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "hello".as_bytes().to_vec(),
-            })
+        let col_produce = col.clone();
+
+        let handle_one = tokio::spawn(async move {
+            let col_lock = col_produce.read().await;
+
+            produce(
+                &col_lock,
+                ProduceRequest {
+                    request_id: 1,
+                    topic: "example-topic".to_string(),
+                    partition: 1,
+                    data: "hello".as_bytes().to_vec(),
+                },
+            )
             .await
             .unwrap();
+        });
 
-        assert_eq!(result.request_id, 1);
-        assert_eq!(result.errors.len(), 0);
+        let col_flush = col.clone();
+        let flush_object_store_ref = object_store.clone();
+        let flush_batch_coord_ref = batch_coordinator.clone();
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let handle_two = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+
+            let mut col_lock = col_flush.write().await;
+
+            let mut new_ref = ProduceRequestCollection::new();
+
+            std::mem::swap(&mut *col_lock, &mut new_ref);
+
+            drop(col_lock); // Explicitly drop the lock.
+
+            let produce_response = flush(new_ref, flush_object_store_ref, flush_batch_coord_ref)
+                .await
+                .unwrap();
+
+            assert_eq!(produce_response.len(), 1);
+        });
+
+        let _ = tokio::join!(handle_one, handle_two);
+
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await;
+            },
+            object_store,
+            batch_coordinator,
+        )
+        .await;
+
+        assert!(consume_response.is_ok());
+
+        let resp = consume_response.unwrap();
+        let batches = await_all_receiver(resp).await;
+
+        assert_eq!(batches.len(), 1);
+        assert_eq!(
+            batches.first().unwrap().batches.first().unwrap().data,
+            bytes::Bytes::from_static(b"hello")
+        );
+
+        tear_down_dirs(batch_coord_path, object_store_path);
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn can_produce_without_failure() {
+        let (batch_coord_path, object_store_path) = set_up_dirs();
+
+        let object_store = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+        );
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
+
+        let col = ProduceRequestCollection::new();
+
+        produce(
+            &col,
+            ProduceRequest {
+                request_id: 1,
+                topic: "example-topic".to_string(),
+                partition: 1,
+                data: "hello".as_bytes().to_vec(),
+            },
+        )
+        .await
+        .unwrap();
+
+        let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(produce_response.len(), 1);
+
+        let consume_response = consume(
+            ConsumeRequest {
+                topic: "example-topic".to_string(),
+                partition: 1,
+                offset: 0,
+                max_partition_fetch_bytes: 0,
+            },
+            object_store,
+            batch_coordinator,
+        )
+        .await;
 
         assert!(consume_response.is_ok());
 
@@ -99,81 +190,115 @@ mod tests {
     async fn can_produce_to_multiple_partitions() {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
-        let config = BrokerConfiguration {
-            object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
-            ),
-            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.to_string_lossy().to_string(),
-            )),
-            segment_size_in_bytes: 50_000,
-            flush_interval_in_ms: 500,
-        };
+        let object_store = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+        );
 
-        let mut broker = Broker::new(config);
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        let result = produce(
+            &collection,
+            ProduceRequest {
                 request_id: 1,
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "hello".as_bytes().to_vec(),
-            })
-            .await;
+            },
+        )
+        .await;
 
-        let result = result.unwrap();
+        result.unwrap();
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
+            .await
+            .unwrap();
+
+        let result = result.first().unwrap();
+
         assert_eq!(result.request_id, 1);
         assert_eq!(result.errors.len(), 0);
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        let result = produce(
+            &collection,
+            ProduceRequest {
                 request_id: 2,
                 topic: "example-topic".to_string(),
                 partition: 2,
                 data: "partition-two".as_bytes().to_vec(),
-            })
+            },
+        )
+        .await;
+
+        result.unwrap();
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
             .unwrap();
+
+        let result = result.first().unwrap();
 
         assert_eq!(result.request_id, 2);
         assert_eq!(result.errors.len(), 0);
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        let result = produce(
+            &collection,
+            ProduceRequest {
                 request_id: 3,
                 topic: "example-topic".to_string(),
                 partition: 3,
                 data: "partition-three".as_bytes().to_vec(),
-            })
+            },
+        )
+        .await;
+
+        result.unwrap();
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
             .unwrap();
+
+        let result = result.first().unwrap();
 
         assert_eq!(result.request_id, 3);
         assert_eq!(result.errors.len(), 0);
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
         assert_eq!(consume_response.first().unwrap().batches.len(), 1);
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 2,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
@@ -189,15 +314,18 @@ mod tests {
             bytes::Bytes::from_static(b"partition-two")
         );
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 3,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
@@ -221,27 +349,27 @@ mod tests {
     async fn can_produce_to_the_same_partition_multiple_times() {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
-        let config = BrokerConfiguration {
-            object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
-            ),
-            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.to_string_lossy().to_string(),
-            )),
-            segment_size_in_bytes: 50_000,
-            flush_interval_in_ms: 500,
-        };
+        let object_store = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+        );
 
-        let mut broker = Broker::new(config);
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 1,
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "hello".as_bytes().to_vec(),
-            })
-            .await;
+            },
+        )
+        .await
+        .unwrap();
 
         tracing::info!(
             "{:#?}",
@@ -250,22 +378,43 @@ mod tests {
                 .collect::<Vec<_>>()
         );
 
-        let result = result.unwrap();
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
+            .await
+            .unwrap();
+
+        let result = result.first().unwrap();
+
         assert_eq!(result.request_id, 1);
 
         tracing::info!("{:#?}", result.errors);
 
         assert_eq!(result.errors.len(), 0);
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 2,
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "partition-two".as_bytes().to_vec(),
-            })
+            },
+        )
+        .await
+        .unwrap();
+
+        tracing::info!(
+            "{:#?}",
+            std::fs::read_dir(&batch_coord_path)
+                .unwrap()
+                .collect::<Vec<_>>()
+        );
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
             .unwrap();
+        let result = result.first().unwrap();
 
         assert_eq!(result.request_id, 2);
 
@@ -273,42 +422,65 @@ mod tests {
 
         assert_eq!(result.errors.len(), 0);
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 3,
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "partition-three".as_bytes().to_vec(),
-            })
+            },
+        )
+        .await
+        .unwrap();
+
+        tracing::info!(
+            "{:#?}",
+            std::fs::read_dir(&batch_coord_path)
+                .unwrap()
+                .collect::<Vec<_>>()
+        );
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
             .unwrap();
+
+        let result = result.first().unwrap();
 
         assert_eq!(result.request_id, 3);
         assert_eq!(result.errors.len(), 0);
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
         assert_eq!(consume_response.first().unwrap().batches.len(), 1);
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 1,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
@@ -324,15 +496,18 @@ mod tests {
             bytes::Bytes::from_static(b"partition-two")
         );
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 2,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
@@ -356,27 +531,32 @@ mod tests {
     async fn can_produce_to_multiple_topics_and_partitions() {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
-        let config = BrokerConfiguration {
-            object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
-            ),
-            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.to_string_lossy().to_string(),
-            )),
-            segment_size_in_bytes: 50_000,
-            flush_interval_in_ms: 500,
-        };
+        let object_store = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+        );
 
-        let mut broker = Broker::new(config);
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 1,
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "hello".as_bytes().to_vec(),
-            })
-            .await;
+            },
+        )
+        .await.unwrap();
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
+            .await
+            .unwrap();
+
+        let result = result.first().unwrap();
 
         tracing::info!(
             "{:#?}",
@@ -385,22 +565,31 @@ mod tests {
                 .collect::<Vec<_>>()
         );
 
-        let result = result.unwrap();
         assert_eq!(result.request_id, 1);
 
         tracing::info!("{:#?}", result.errors);
 
         assert_eq!(result.errors.len(), 0);
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 2,
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "example-topic-partition-one-first".as_bytes().to_vec(),
-            })
+            },
+        )
+        .await
+        .unwrap();
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
             .unwrap();
+
+        let result = result.first().unwrap();
 
         assert_eq!(result.request_id, 2);
 
@@ -408,45 +597,76 @@ mod tests {
 
         assert_eq!(result.errors.len(), 0);
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 3,
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "example-topic-partition-one-second".as_bytes().to_vec(),
-            })
+            },
+        )
+        .await
+        .unwrap();
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
             .unwrap();
+
+        let result = result.first().unwrap();
 
         assert_eq!(result.request_id, 3);
         assert_eq!(result.errors.len(), 0);
 
         // Different Topics
-        let result = broker
-            .produce(ProduceRequest {
+
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 4,
                 topic: "example-topic-two".to_string(),
                 partition: 1,
                 data: "example-topic-two-partition-one-first".as_bytes().to_vec(),
-            })
-            .await;
+            },
+        )
+        .await
+        .unwrap();
 
-        let result = result.unwrap();
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
+            .await
+            .unwrap();
+
+        let result = result.first().unwrap();
+
         assert_eq!(result.request_id, 4);
 
         tracing::info!("{:#?}", result.errors);
 
         assert_eq!(result.errors.len(), 0);
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 5,
                 topic: "example-topic-two".to_string(),
                 partition: 1,
                 data: "example-topic-two-partition-one-second".as_bytes().to_vec(),
-            })
+            },
+        )
+        .await
+        .unwrap();
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
             .unwrap();
+
+        let result = result.first().unwrap();
 
         assert_eq!(result.request_id, 5);
 
@@ -454,41 +674,58 @@ mod tests {
 
         assert_eq!(result.errors.len(), 0);
 
-        let result = broker
-            .produce(ProduceRequest {
+        let collection = ProduceRequestCollection::new();
+
+        produce(
+            &collection,
+            ProduceRequest {
                 request_id: 6,
                 topic: "example-topic-two".to_string(),
                 partition: 2,
                 data: "example-topic-two-partition-two-first".as_bytes().to_vec(),
-            })
+            },
+        )
+        .await
+        .unwrap();
+
+        let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
             .unwrap();
+
+        let result = result.first().unwrap();
 
         assert_eq!(result.request_id, 6);
         assert_eq!(result.errors.len(), 0);
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
+
         let consume_response = await_all_receiver(consume_response).await;
 
         assert_eq!(consume_response.first().unwrap().batches.len(), 1);
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 1,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
@@ -504,15 +741,18 @@ mod tests {
             bytes::Bytes::from_static(b"example-topic-partition-one-first")
         );
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic".to_string(),
                 partition: 1,
                 offset: 2,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
@@ -528,29 +768,35 @@ mod tests {
             bytes::Bytes::from_static(b"example-topic-partition-one-second")
         );
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic-two".to_string(),
                 partition: 1,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
         assert_eq!(consume_response.first().unwrap().batches.len(), 1);
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic-two".to_string(),
                 partition: 2,
                 offset: 0,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
@@ -566,15 +812,18 @@ mod tests {
             bytes::Bytes::from_static(b"example-topic-two-partition-two-first")
         );
 
-        let consume_response = broker
-            .consume(ConsumeRequest {
+        let consume_response = consume(
+            ConsumeRequest {
                 topic: "example-topic-two".to_string(),
                 partition: 1,
                 offset: 1,
                 max_partition_fetch_bytes: 0,
-            })
-            .await
-            .unwrap();
+            },
+            object_store.clone(),
+            batch_coordinator.clone(),
+        )
+        .await
+        .unwrap();
 
         let consume_response = await_all_receiver(consume_response).await;
 
@@ -598,28 +847,19 @@ mod tests {
     async fn can_request_deletion_of_records() {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
-        let config = BrokerConfiguration {
-            object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
-            ),
-            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.to_string_lossy().to_string(),
-            )),
-            segment_size_in_bytes: 50_000,
-            flush_interval_in_ms: 500,
-        };
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
 
-        let mut broker = Broker::new(config);
-
-        let result = broker
-            .delete_record(
-                riskless::messages::delete_record_request::DeleteRecordsRequest {
-                    topic: "".to_string(),
-                    partition: 1,
-                    offset: 0,
-                },
-            )
-            .await;
+        let result = delete_record(
+            riskless::messages::delete_record_request::DeleteRecordsRequest {
+                topic: "".to_string(),
+                partition: 1,
+                offset: 0,
+            },
+            batch_coordinator.clone(),
+        )
+        .await;
 
         assert!(result.is_ok());
 
@@ -635,20 +875,17 @@ mod tests {
     async fn can_delete_files_effectively() {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
-        let config = BrokerConfiguration {
-            object_store: Arc::new(
-                object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
-            ),
-            batch_coordinator: Arc::new(SimpleBatchCoordinator::new(
-                batch_coord_path.to_string_lossy().to_string(),
-            )),
-            segment_size_in_bytes: 50_000,
-            flush_interval_in_ms: 500,
-        };
+        let object_store = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+        );
 
-        let mut broker = Broker::new(config);
+        let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
+            batch_coord_path.to_string_lossy().to_string(),
+        ));
 
-        broker.heartbeat_permanent_delete().await.unwrap();
+        scan_and_permanently_delete_records(batch_coordinator, object_store)
+            .await
+            .unwrap();
 
         tear_down_dirs(batch_coord_path, object_store_path);
     }

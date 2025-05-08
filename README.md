@@ -24,38 +24,43 @@ riskless = "x.x"
 ### How to use
 
 ```rust
-let mut batch_coordinator = ...; // Custom implementation of BatchCoordinator.
-let mut object_store = ...; // Create an object store.
+// Custom implementation of BatchCoordinator.
+let mut batch_coordinator = Arc::new(MyBatchCoordinator::new()); 
+// Create an object store.
+let mut object_store = Arc::new(MyObjectStore::new()); 
 
-let config = BrokerConfiguration {
-    object_store,
-    batch_coordinator,
-    segment_size_in_bytes: 50_000,
-    flush_interval_in_ms: 500,
-};
+// Create the current produce request collection
+let col = ProduceRequestCollection::new();
 
-// Create the broker.
-let mut broker = Broker::new(config);
-
-// Produce to an aribitrary topic. 
-let produce_result = broker
-    .produce(ProduceRequest {
+produce(
+    &col,
+    ProduceRequest {
+        request_id: 1,
         topic: "example-topic".to_string(),
         partition: 1,
         data: "hello".as_bytes().to_vec(),
-    })
-    .await?;
+    },
+)
+.await
+.unwrap();
 
-let receiver = broker
-    .consume(ConsumeRequest {
+let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
+    .await
+    .unwrap();
+
+assert_eq!(produce_response.len(), 1);
+
+let consume_response = consume(
+    ConsumeRequest {
         topic: "example-topic".to_string(),
         partition: 1,
         offset: 0,
-        max_partition_fetch_bytes: 50_000,
-    });
-
-let response = receiver.recv().await;    
-
+        max_partition_fetch_bytes: 0,
+    },
+    object_store,
+    batch_coordinator,
+)
+.await;
 ```
 
 #### Implementation of BatchCoordinator
@@ -71,10 +76,6 @@ There is a SimpleBatchCoordinator implementation that ships with Riskless that i
 
 ```rust 
 let mut batch_coordinator = SimpleBatchhCoordinator::new("current_dir");
-let config = BrokerConfiguration {
-    object_store,
-    batch_coordinator
-};
 ```
 
 ## License
