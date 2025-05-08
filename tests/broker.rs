@@ -16,7 +16,7 @@ mod tests {
     use riskless::messages::consume_request::ConsumeRequest;
     use riskless::messages::produce_request::{ProduceRequest, ProduceRequestCollection};
     use riskless::{
-        batch_coordinator, consume, delete_record, flush, produce,
+        consume, delete_record, flush, produce,
         scan_and_permanently_delete_records,
     };
     use std::path::PathBuf;
@@ -64,7 +64,7 @@ mod tests {
         let handle_one = tokio::spawn(async move {
             let col_lock = col_produce.read().await;
 
-            let _ = produce(
+            produce(
                 &col_lock,
                 ProduceRequest {
                     request_id: 1,
@@ -141,7 +141,7 @@ mod tests {
 
         let col = ProduceRequestCollection::new();
 
-        let _ = produce(
+        produce(
             &col,
             ProduceRequest {
                 request_id: 1,
@@ -211,7 +211,7 @@ mod tests {
         )
         .await;
 
-        let result = result.unwrap();
+        result.unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -235,7 +235,7 @@ mod tests {
         )
         .await;
 
-        let result = result.unwrap();
+        result.unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -259,7 +259,7 @@ mod tests {
         )
         .await;
 
-        let result = result.unwrap();
+        result.unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -359,7 +359,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 1,
@@ -392,7 +392,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 2,
@@ -424,7 +424,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 3,
@@ -541,7 +541,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 1,
@@ -550,7 +550,7 @@ mod tests {
                 data: "hello".as_bytes().to_vec(),
             },
         )
-        .await;
+        .await.unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -573,7 +573,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 2,
@@ -599,7 +599,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 3,
@@ -624,7 +624,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 4,
@@ -650,7 +650,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 5,
@@ -676,7 +676,7 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
+        produce(
             &collection,
             ProduceRequest {
                 request_id: 6,
