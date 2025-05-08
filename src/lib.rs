@@ -5,12 +5,12 @@
 //! example usage:
 //!
 //! ```ignore
-//! 
+//!
 //! let object_store = Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").unwrap());
 //! let batch_coordinator = Arc::new(SimpleBatchCoordinator::new("index".to_string()));
-//! 
+//!
 //! let collection = ProduceRequestCollection::new();
-//! 
+//!
 //! collection.collect(
 //!     ProduceRequest {
 //!         request_id: 1,
@@ -58,8 +58,8 @@ use std::{collections::HashSet, sync::Arc};
 use batch_coordinator::{BatchCoordinator, DeleteFilesRequest, FindBatchRequest, TopicIdPartition};
 use bytes::Bytes;
 use messages::{
-    CommitBatchRequest, ConsumeBatch, ConsumeRequest, ConsumeResponse,
-    ProduceRequestCollection, ProduceResponse,
+    CommitBatchRequest, ConsumeBatch, ConsumeRequest, ConsumeResponse, ProduceRequestCollection,
+    ProduceResponse,
 };
 pub mod error;
 
