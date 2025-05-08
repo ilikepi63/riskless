@@ -14,8 +14,8 @@ use std::{
     sync::{Arc, atomic::Ordering},
 };
 
-use batch_coordinator::{BatchCoordinator, FindBatchRequest, TopicIdPartition};
-pub use broker::{Broker, BrokerConfiguration};
+use batch_coordinator::{BatchCoordinator, DeleteFilesRequest, FindBatchRequest, TopicIdPartition};
+// pub use broker::{Broker, BrokerConfiguration};
 use bytes::Bytes;
 use dashmap::Entry;
 use messages::{
@@ -27,7 +27,7 @@ use messages::{
 };
 pub mod error;
 
-use error::RisklessResult;
+use error::{RisklessError, RisklessResult};
 use object_store::{ObjectStore, PutPayload, path::Path};
 use shared_log_segment::SharedLogSegment;
 
@@ -194,4 +194,73 @@ pub async fn consume(
     }
 
     Ok(batch_reponse_rx)
+}
+
+/// Delete a specific record.
+///
+/// Important to note that this undertakes a "soft" delete, which means that
+/// the record still persists in object storage, but does not persist in the BatchCoordinator.
+///
+/// The process to permanently delete files and records from the underlying object storage is done by a separate function.
+#[tracing::instrument(skip_all, name = "delete_records")]
+pub async fn delete_record(
+    request: crate::messages::delete_record_request::DeleteRecordsRequest,
+    batch_coordinator: Arc<dyn BatchCoordinator>,
+) -> RisklessResult<crate::messages::delete_record_response::DeleteRecordsResponse> {
+    let result = batch_coordinator
+        .delete_records(vec![request.try_into().map_err(|e| {
+            RisklessError::Generic(format!(
+                "Failed to convert request into DeleteRecordsRequest with error {:#?}",
+                e
+            ))
+        })?])
+        .await
+        .pop()
+        .ok_or(RisklessError::Unknown)?;
+
+    result.try_into()
+}
+
+/// As Records become "soft" deleted over time, the underlying storage mechanism may
+/// have clusters that do not have any references to live records after a certain amount of time.
+///
+/// This will make the storage mechanism's collection ready for delete. This function effectively
+/// queries the batch coordinator for objects that are ready for delete and then attempts to delete them.
+///
+/// The interval at which this happens is delegated to the implementor.
+#[tracing::instrument(skip_all, name = "heartbeat_permanent_delete")]
+pub async fn scan_and_permanently_delete_records(
+    batch_coordinator: Arc<dyn BatchCoordinator>,
+    object_store: Arc<dyn ObjectStore>,
+) -> RisklessResult<()> {
+    let files_to_delete = batch_coordinator.get_files_to_delete().await;
+
+    for file in files_to_delete {
+        let batch_coordinator = batch_coordinator.clone();
+        let object_store = object_store.clone();
+
+        tokio::spawn(async move {
+            let file_path = object_store::path::Path::from(file.object_key.as_ref());
+
+            let result = object_store.delete(&file_path).await;
+
+            match result {
+                Ok(_) => {
+                    batch_coordinator
+                        .delete_files(DeleteFilesRequest {
+                            object_key_paths: HashSet::from([file.object_key]),
+                        })
+                        .await;
+                }
+                Err(err) => {
+                    tracing::error!(
+                        "Error occurred when trying to delete files in object store: {:#?}",
+                        err
+                    );
+                }
+            }
+        });
+    }
+
+    Ok(())
 }
