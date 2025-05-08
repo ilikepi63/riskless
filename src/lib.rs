@@ -29,6 +29,7 @@ pub mod error;
 use error::{RisklessError, RisklessResult};
 use object_store::{ObjectStore, PutPayload, path::Path};
 use shared_log_segment::SharedLogSegment;
+pub use object_store;
 
 /// Handles a produce request by buffering the message for later persistence.
 ///
