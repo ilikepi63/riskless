@@ -4,7 +4,6 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod batch_coordinator;
-mod broker;
 pub mod messages;
 mod shared_log_segment;
 mod utils;
