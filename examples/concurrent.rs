@@ -4,8 +4,8 @@ use riskless::{
     batch_coordinator::simple::SimpleBatchCoordinator,
     consume, flush,
     messages::{
-        consume_request::ConsumeRequest,
-        produce_request::{ProduceRequest, ProduceRequestCollection},
+        ConsumeRequest,
+        ProduceRequest, ProduceRequestCollection,
     },
     produce,
 };
@@ -75,7 +75,9 @@ async fn main() {
 
     assert!(consume_response.is_ok());
 
-    let mut resp = consume_response.unwrap();
+    let mut 
+    
+    resp = consume_response.unwrap();
     let batch = resp.recv().await;
 
     println!("Batch: {:#?}", batch);

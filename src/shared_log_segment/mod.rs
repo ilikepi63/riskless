@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::{
     error::RisklessError,
-    messages::{batch_coordinate::BatchCoordinate, produce_request::ProduceRequestCollection},
+    messages::{BatchCoordinate, ProduceRequestCollection},
 };
 
 static MAGIC_NUMBER: u32 = 522;
@@ -129,7 +129,7 @@ impl From<SharedLogSegment> for bytes::Bytes {
 
 #[cfg(test)]
 mod tests {
-    use crate::messages::produce_request::ProduceRequest;
+    use crate::messages::ProduceRequest;
 
     use super::*;
     use std::convert::TryFrom;

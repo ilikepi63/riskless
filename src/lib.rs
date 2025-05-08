@@ -59,11 +59,8 @@ use batch_coordinator::{BatchCoordinator, DeleteFilesRequest, FindBatchRequest, 
 // pub use broker::{Broker, BrokerConfiguration};
 use bytes::Bytes;
 use messages::{
-    commit_batch_request::CommitBatchRequest,
-    consume_request::ConsumeRequest,
-    consume_response::{ConsumeBatch, ConsumeResponse},
-    produce_request::{ProduceRequest, ProduceRequestCollection},
-    produce_response::ProduceResponse,
+    CommitBatchRequest, ConsumeBatch, ConsumeRequest, ConsumeResponse, ProduceRequest,
+    ProduceRequestCollection, ProduceResponse,
 };
 pub mod error;
 
@@ -110,6 +107,7 @@ pub async fn produce(
     Ok(())
 }
 
+/// Flush the ProduceRequestCollection to the ObjectStore/BatchCoordinator.
 pub async fn flush(
     reqs: ProduceRequestCollection,
     object_storage: Arc<dyn ObjectStore>,
@@ -247,9 +245,9 @@ pub async fn consume(
 /// The process to permanently delete files and records from the underlying object storage is done by a separate function.
 #[tracing::instrument(skip_all, name = "delete_records")]
 pub async fn delete_record(
-    request: crate::messages::delete_record_request::DeleteRecordsRequest,
+    request: crate::messages::DeleteRecordsRequest,
     batch_coordinator: Arc<dyn BatchCoordinator>,
-) -> RisklessResult<crate::messages::delete_record_response::DeleteRecordsResponse> {
+) -> RisklessResult<crate::messages::DeleteRecordsResponse> {
     let result = batch_coordinator
         .delete_records(vec![request.try_into().map_err(|e| {
             RisklessError::Generic(format!(

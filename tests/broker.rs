@@ -13,8 +13,8 @@ async fn await_all_receiver<T>(mut recv: tokio::sync::mpsc::Receiver<T>) -> Vec<
 mod tests {
 
     use riskless::batch_coordinator::simple::SimpleBatchCoordinator;
-    use riskless::messages::consume_request::ConsumeRequest;
-    use riskless::messages::produce_request::{ProduceRequest, ProduceRequestCollection};
+    use riskless::messages::ConsumeRequest;
+    use riskless::messages::{ProduceRequest, ProduceRequestCollection};
     use riskless::{
         consume, delete_record, flush, produce,
         scan_and_permanently_delete_records,
@@ -852,7 +852,7 @@ mod tests {
         ));
 
         let result = delete_record(
-            riskless::messages::delete_record_request::DeleteRecordsRequest {
+            riskless::messages::DeleteRecordsRequest {
                 topic: "".to_string(),
                 partition: 1,
                 offset: 0,

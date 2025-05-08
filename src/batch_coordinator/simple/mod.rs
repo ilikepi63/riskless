@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::{
     batch_coordinator::BatchInfo, error::RisklessResult,
-    messages::commit_batch_request::CommitBatchRequest,
+    messages::CommitBatchRequest,
 };
 
 use crate::batch_coordinator::{

@@ -5,17 +5,25 @@ use crate::{
     error::RisklessError,
 };
 
+/// Represents the data of a given record.
 #[derive(Debug, Clone)]
 pub struct ConsumeBatch {
+    /// The topic of the record.
     pub topic: String,
+    /// Partition of a record.
     pub partition: u64,
-    pub offset: u64,
+    /// The offset of this record.
+        pub offset: u64,
+    /// The maximum amount of bytes to retrieve from each partition.
     pub max_partition_fetch_bytes: u32,
+    /// The bytes retrieved.
     pub data: Bytes,
 }
 
+/// The wrapping consume response.
 #[derive(Debug, Clone)]
 pub struct ConsumeResponse {
+    /// The batches retrieved from the request.
     pub batches: Vec<ConsumeBatch>,
 }
 

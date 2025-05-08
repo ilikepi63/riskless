@@ -1,3 +1,4 @@
+//! Errors.
 use std::{array::TryFromSliceError, num::TryFromIntError};
 
 use thiserror::Error;

@@ -3,10 +3,7 @@ use std::sync::Arc;
 use riskless::{
     batch_coordinator::simple::SimpleBatchCoordinator,
     consume, flush,
-    messages::{
-        consume_request::ConsumeRequest,
-        produce_request::{ProduceRequest, ProduceRequestCollection},
-    },
+    messages::{ConsumeRequest, ProduceRequest, ProduceRequestCollection},
     produce,
 };
 

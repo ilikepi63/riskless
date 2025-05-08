@@ -1,7 +1,9 @@
 use crate::error::RisklessError;
 
+/// A response representing the outcome of a delete record request.
 #[derive(Debug)]
 pub struct DeleteRecordsResponse {
+    /// The errors emitted from the request.
     pub errors: Vec<String>,
 }
 
