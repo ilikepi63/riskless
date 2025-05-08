@@ -5,10 +5,11 @@
 //! example usage:
 //!
 //! ```rust
-//!   let object_store =
-//!     Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").unwrap());
+//! let object_store = Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").unwrap());
 //! let batch_coordinator = Arc::new(SimpleBatchCoordinator::new("index".to_string()));
+//! 
 //! let col = ProduceRequestCollection::new();
+//! 
 //! produce(
 //!     &col,
 //!     ProduceRequest {
