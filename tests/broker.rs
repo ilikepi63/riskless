@@ -15,7 +15,7 @@ mod tests {
     use riskless::batch_coordinator::simple::SimpleBatchCoordinator;
     use riskless::messages::ConsumeRequest;
     use riskless::messages::{ProduceRequest, ProduceRequestCollection};
-    use riskless::{consume, delete_record, flush, produce, scan_and_permanently_delete_records};
+    use riskless::{consume, delete_record, flush, scan_and_permanently_delete_records};
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::Duration;
@@ -61,17 +61,14 @@ mod tests {
         let handle_one = tokio::spawn(async move {
             let col_lock = col_produce.read().await;
 
-            produce(
-                &col_lock,
-                ProduceRequest {
+            col_lock
+                .collect(ProduceRequest {
                     request_id: 1,
                     topic: "example-topic".to_string(),
                     partition: 1,
                     data: "hello".as_bytes().to_vec(),
-                },
-            )
-            .await
-            .unwrap();
+                })
+                .unwrap();
         });
 
         let col_flush = col.clone();
@@ -138,16 +135,12 @@ mod tests {
 
         let col = ProduceRequestCollection::new();
 
-        produce(
-            &col,
-            ProduceRequest {
-                request_id: 1,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "hello".as_bytes().to_vec(),
-            },
-        )
-        .await
+        col.collect(ProduceRequest {
+            request_id: 1,
+            topic: "example-topic".to_string(),
+            partition: 1,
+            data: "hello".as_bytes().to_vec(),
+        })
         .unwrap();
 
         let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
@@ -197,16 +190,12 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
-            &collection,
-            ProduceRequest {
-                request_id: 1,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "hello".as_bytes().to_vec(),
-            },
-        )
-        .await;
+        let result = collection.collect(ProduceRequest {
+            request_id: 1,
+            topic: "example-topic".to_string(),
+            partition: 1,
+            data: "hello".as_bytes().to_vec(),
+        });
 
         result.unwrap();
 
@@ -221,17 +210,12 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
-            &collection,
-            ProduceRequest {
-                request_id: 2,
-                topic: "example-topic".to_string(),
-                partition: 2,
-                data: "partition-two".as_bytes().to_vec(),
-            },
-        )
-        .await;
-
+        let result = collection.collect(ProduceRequest {
+            request_id: 2,
+            topic: "example-topic".to_string(),
+            partition: 2,
+            data: "partition-two".as_bytes().to_vec(),
+        });
         result.unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
@@ -245,17 +229,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        let result = produce(
-            &collection,
-            ProduceRequest {
-                request_id: 3,
-                topic: "example-topic".to_string(),
-                partition: 3,
-                data: "partition-three".as_bytes().to_vec(),
-            },
-        )
-        .await;
-
+        let result = collection
+            .collect(
+                ProduceRequest {
+                    request_id: 3,
+                    topic: "example-topic".to_string(),
+                    partition: 3,
+                    data: "partition-three".as_bytes().to_vec(),
+                },
+            )
+;
         result.unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
@@ -356,17 +339,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 1,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "hello".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 1,
+                    topic: "example-topic".to_string(),
+                    partition: 1,
+                    data: "hello".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         tracing::info!(
             "{:#?}",
@@ -389,17 +371,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 2,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "partition-two".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 2,
+                    topic: "example-topic".to_string(),
+                    partition: 1,
+                    data: "partition-two".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         tracing::info!(
             "{:#?}",
@@ -421,17 +402,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 3,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "partition-three".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 3,
+                    topic: "example-topic".to_string(),
+                    partition: 1,
+                    data: "partition-three".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         tracing::info!(
             "{:#?}",
@@ -538,17 +518,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 1,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "hello".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 1,
+                    topic: "example-topic".to_string(),
+                    partition: 1,
+                    data: "hello".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -571,17 +550,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 2,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "example-topic-partition-one-first".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 2,
+                    topic: "example-topic".to_string(),
+                    partition: 1,
+                    data: "example-topic-partition-one-first".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -597,17 +575,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 3,
-                topic: "example-topic".to_string(),
-                partition: 1,
-                data: "example-topic-partition-one-second".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 3,
+                    topic: "example-topic".to_string(),
+                    partition: 1,
+                    data: "example-topic-partition-one-second".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -622,17 +599,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 4,
-                topic: "example-topic-two".to_string(),
-                partition: 1,
-                data: "example-topic-two-partition-one-first".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 4,
+                    topic: "example-topic-two".to_string(),
+                    partition: 1,
+                    data: "example-topic-two-partition-one-first".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -648,17 +624,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 5,
-                topic: "example-topic-two".to_string(),
-                partition: 1,
-                data: "example-topic-two-partition-one-second".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 5,
+                    topic: "example-topic-two".to_string(),
+                    partition: 1,
+                    data: "example-topic-two-partition-one-second".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
@@ -674,17 +649,16 @@ mod tests {
 
         let collection = ProduceRequestCollection::new();
 
-        produce(
-            &collection,
-            ProduceRequest {
-                request_id: 6,
-                topic: "example-topic-two".to_string(),
-                partition: 2,
-                data: "example-topic-two-partition-two-first".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+        collection
+            .collect(
+                ProduceRequest {
+                    request_id: 6,
+                    topic: "example-topic-two".to_string(),
+                    partition: 2,
+                    data: "example-topic-two-partition-two-first".as_bytes().to_vec(),
+                },
+            )
+            .unwrap();
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await

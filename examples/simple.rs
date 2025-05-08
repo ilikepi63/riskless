@@ -4,7 +4,6 @@ use riskless::{
     batch_coordinator::simple::SimpleBatchCoordinator,
     consume, flush,
     messages::{ConsumeRequest, ProduceRequest, ProduceRequestCollection},
-    produce,
 };
 
 #[tokio::main]
@@ -15,16 +14,13 @@ async fn main() {
 
     let col = ProduceRequestCollection::new();
 
-    produce(
-        &col,
-        ProduceRequest {
+    col.collect(        ProduceRequest {
             request_id: 1,
             topic: "example-topic".to_string(),
             partition: 1,
             data: "hello".as_bytes().to_vec(),
         },
     )
-    .await
     .unwrap();
 
     let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())

@@ -30,10 +30,9 @@ let mut batch_coordinator = Arc::new(MyBatchCoordinator::new());
 let mut object_store = Arc::new(MyObjectStore::new()); 
 
 // Create the current produce request collection
-let col = ProduceRequestCollection::new();
+let collection = ProduceRequestCollection::new();
 
-produce(
-    &col,
+collection.collect(    
     ProduceRequest {
         request_id: 1,
         topic: "example-topic".to_string(),
