@@ -39,9 +39,7 @@ async fn main() {
 
         let mut col_lock = col_flush.write().await;
 
-        let mut new_ref = ProduceRequestCollection::new();
-
-        std::mem::swap(&mut *col_lock, &mut new_ref);
+        let new_ref = col_lock.take();
 
         drop(col_lock);
 

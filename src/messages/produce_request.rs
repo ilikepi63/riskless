@@ -49,6 +49,15 @@ impl ProduceRequestCollection {
         self.size = AtomicU64::new(0);
     }
 
+    /// Creates a new collection, swaps it with this instance and returns the given collection.
+    pub fn take(&mut self) -> Self {
+        let mut other = ProduceRequestCollection::new();
+
+        std::mem::swap(&mut *self, &mut other);
+
+        other
+    }
+
     /// Collect a produce request into this struct.
     pub fn collect(&self, req: ProduceRequest) -> RisklessResult<()> {
         tracing::info!("Collecting: {:#?}", req);
