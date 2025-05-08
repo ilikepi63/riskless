@@ -4,7 +4,6 @@ use riskless::{
     batch_coordinator::simple::SimpleBatchCoordinator,
     consume, flush,
     messages::{ConsumeRequest, ProduceRequest, ProduceRequestCollection},
-    produce,
 };
 use tokio::sync::RwLock;
 
@@ -21,17 +20,14 @@ async fn main() {
     let handle_one = tokio::spawn(async move {
         let col_lock = col_produce.read().await;
 
-        produce(
-            &col_lock,
-            ProduceRequest {
+        col_lock
+            .collect(ProduceRequest {
                 request_id: 1,
                 topic: "example-topic".to_string(),
                 partition: 1,
                 data: "hello".as_bytes().to_vec(),
-            },
-        )
-        .await
-        .unwrap();
+            })
+            .unwrap();
     });
 
     let col_flush = col.clone();

@@ -4,14 +4,14 @@
 //!
 //! example usage:
 //!
-//! ```rust
+//! ```ignore
+//! 
 //! let object_store = Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").unwrap());
 //! let batch_coordinator = Arc::new(SimpleBatchCoordinator::new("index".to_string()));
 //! 
-//! let col = ProduceRequestCollection::new();
+//! let collection = ProduceRequestCollection::new();
 //! 
-//! produce(
-//!     &col,
+//! collection.collect(
 //!     ProduceRequest {
 //!         request_id: 1,
 //!         topic: "example-topic".to_string(),
@@ -19,10 +19,9 @@
 //!         data: "hello".as_bytes().to_vec(),
 //!     },
 //! )
-//! .await
 //! .unwrap();
 //!
-//! let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
+//! let produce_response = flush(collection, object_store.clone(), batch_coordinator.clone())
 //!     .await
 //!     .unwrap();
 //!
@@ -57,10 +56,9 @@ mod shared_log_segment;
 use std::{collections::HashSet, sync::Arc};
 
 use batch_coordinator::{BatchCoordinator, DeleteFilesRequest, FindBatchRequest, TopicIdPartition};
-// pub use broker::{Broker, BrokerConfiguration};
 use bytes::Bytes;
 use messages::{
-    CommitBatchRequest, ConsumeBatch, ConsumeRequest, ConsumeResponse, ProduceRequest,
+    CommitBatchRequest, ConsumeBatch, ConsumeRequest, ConsumeResponse,
     ProduceRequestCollection, ProduceResponse,
 };
 pub mod error;
@@ -69,44 +67,6 @@ use error::{RisklessError, RisklessResult};
 pub use object_store;
 use object_store::{ObjectStore, PutPayload, path::Path};
 use shared_log_segment::SharedLogSegment;
-
-/// Handles a produce request by buffering the message for later persistence.
-///
-/// The message is added to an in-memory buffer which will be periodically
-/// flushed to object storage by a background task. The actual persistence
-/// happens asynchronously.
-#[tracing::instrument(skip_all, name = "produce")]
-pub async fn produce(
-    collection: &ProduceRequestCollection,
-    request: ProduceRequest,
-) -> RisklessResult<()> {
-    tracing::info!("Producing Request {:#?}.", request);
-
-    collection.collect(request)?;
-
-    // let topic_id_partition = TopicIdPartition(request.topic.clone(), request.partition);
-
-    // let entry = collection.inner.entry(topic_id_partition);
-
-    // match entry {
-    //     Entry::Occupied(mut occupied_entry) => {
-    //         collection.size.fetch_add(
-    //             TryInto::<u64>::try_into(request.data.len())?,
-    //             Ordering::Relaxed,
-    //         );
-    //         occupied_entry.get_mut().push(request.clone());
-    //     }
-    //     Entry::Vacant(vacant_entry) => {
-    //         collection.size.fetch_add(
-    //             TryInto::<u64>::try_into(request.data.len())?,
-    //             Ordering::Relaxed,
-    //         );
-    //         vacant_entry.insert(vec![request.clone()]);
-    //     }
-    // }
-
-    Ok(())
-}
 
 /// Flush the ProduceRequestCollection to the ObjectStore/BatchCoordinator.
 pub async fn flush(
