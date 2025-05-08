@@ -14,13 +14,12 @@ async fn main() {
 
     let col = ProduceRequestCollection::new();
 
-    col.collect(        ProduceRequest {
-            request_id: 1,
-            topic: "example-topic".to_string(),
-            partition: 1,
-            data: "hello".as_bytes().to_vec(),
-        },
-    )
+    col.collect(ProduceRequest {
+        request_id: 1,
+        topic: "example-topic".to_string(),
+        partition: 1,
+        data: "hello".as_bytes().to_vec(),
+    })
     .unwrap();
 
     let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
