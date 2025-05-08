@@ -129,7 +129,7 @@ impl From<SharedLogSegment> for bytes::Bytes {
 
 #[cfg(test)]
 mod tests {
-    use crate::{messages::produce_request::ProduceRequest, utils::request_response::Request};
+    use crate::messages::produce_request::ProduceRequest;
 
     use super::*;
     use std::convert::TryFrom;
@@ -149,13 +149,12 @@ mod tests {
         let collection = ProduceRequestCollection::new();
 
         collection.collect(
-            Request::new(ProduceRequest {
+            ProduceRequest {
                 request_id: 1,
                 topic: "test".to_string(),
                 partition: 0,
                 data: vec![1, 2, 3],
-            })
-            .0,
+            },
         )?;
 
         let result = SharedLogSegment::try_from(collection);
@@ -194,34 +193,31 @@ mod tests {
 
         // Partition 0
         collection.collect(
-            Request::new(ProduceRequest {
+            ProduceRequest {
                 request_id: 1,
                 topic: "test".to_string(),
                 partition: 0,
                 data: vec![1, 2, 3],
-            })
-            .0,
+            },
         )?;
 
         collection.collect(
-            Request::new(ProduceRequest {
+            ProduceRequest {
                 request_id: 2,
                 topic: "test".to_string(),
                 partition: 0,
                 data: vec![4, 5],
-            })
-            .0,
+            },
         )?;
 
         // Partition 1
         collection.collect(
-            Request::new(ProduceRequest {
+            ProduceRequest {
                 request_id: 3,
                 topic: "test".to_string(),
                 partition: 1,
                 data: vec![6, 7, 8, 9],
-            })
-            .0,
+            },
         )?;
 
         let result = SharedLogSegment::try_from(collection);
@@ -261,13 +257,13 @@ mod tests {
 
         let expected_large_data = [header, large_data.clone()].concat();
 
-        let request = Request::new(ProduceRequest {
+        let request = ProduceRequest {
             request_id: 1,
             topic: "large".to_string(),
             partition: 0,
             data: large_data.clone(),
-        });
-        collection.collect(request.0)?;
+        };
+        collection.collect(request)?;
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());

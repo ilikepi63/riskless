@@ -6,17 +6,15 @@
 pub mod batch_coordinator;
 pub mod messages;
 mod shared_log_segment;
-mod utils;
 
 use std::{
     collections::HashSet,
-    sync::{Arc, atomic::Ordering},
+    sync::Arc,
 };
 
 use batch_coordinator::{BatchCoordinator, DeleteFilesRequest, FindBatchRequest, TopicIdPartition};
 // pub use broker::{Broker, BrokerConfiguration};
 use bytes::Bytes;
-use dashmap::Entry;
 use messages::{
     commit_batch_request::CommitBatchRequest,
     consume_request::ConsumeRequest,
@@ -43,26 +41,28 @@ pub async fn produce(
 ) -> RisklessResult<()> {
     tracing::info!("Producing Request {:#?}.", request);
 
-    let topic_id_partition = TopicIdPartition(request.topic.clone(), request.partition);
+collection.collect(request)?;
 
-    let entry = collection.inner.entry(topic_id_partition);
+    // let topic_id_partition = TopicIdPartition(request.topic.clone(), request.partition);
 
-    match entry {
-        Entry::Occupied(mut occupied_entry) => {
-            collection.size.fetch_add(
-                TryInto::<u64>::try_into(request.data.len())?,
-                Ordering::Relaxed,
-            );
-            occupied_entry.get_mut().push(request.clone());
-        }
-        Entry::Vacant(vacant_entry) => {
-            collection.size.fetch_add(
-                TryInto::<u64>::try_into(request.data.len())?,
-                Ordering::Relaxed,
-            );
-            vacant_entry.insert(vec![request.clone()]);
-        }
-    }
+    // let entry = collection.inner.entry(topic_id_partition);
+
+    // match entry {
+    //     Entry::Occupied(mut occupied_entry) => {
+    //         collection.size.fetch_add(
+    //             TryInto::<u64>::try_into(request.data.len())?,
+    //             Ordering::Relaxed,
+    //         );
+    //         occupied_entry.get_mut().push(request.clone());
+    //     }
+    //     Entry::Vacant(vacant_entry) => {
+    //         collection.size.fetch_add(
+    //             TryInto::<u64>::try_into(request.data.len())?,
+    //             Ordering::Relaxed,
+    //         );
+    //         vacant_entry.insert(vec![request.clone()]);
+    //     }
+    // }
 
     Ok(())
 }
