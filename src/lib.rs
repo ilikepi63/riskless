@@ -1,4 +1,50 @@
-// #![deny(missing_docs)]
+//! Riskless
+//!
+//! An implementation of KIP-1150 - Diskless Topics as a reuseable library for general implementation of distributed logs on object storage.
+//!
+//! example usage:
+//!
+//! ```rust
+//!   let object_store =
+//!     Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").unwrap());
+//! let batch_coordinator = Arc::new(SimpleBatchCoordinator::new("index".to_string()));
+//! let col = ProduceRequestCollection::new();
+//! produce(
+//!     &col,
+//!     ProduceRequest {
+//!         request_id: 1,
+//!         topic: "example-topic".to_string(),
+//!         partition: 1,
+//!         data: "hello".as_bytes().to_vec(),
+//!     },
+//! )
+//! .await
+//! .unwrap();
+//!
+//! let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
+//!     .await
+//!     .unwrap();
+//!
+//! assert_eq!(produce_response.len(), 1);
+//!
+//! let consume_response = consume(
+//!     ConsumeRequest {
+//!         topic: "example-topic".to_string(),
+//!         partition: 1,
+//!         offset: 0,
+//!         max_partition_fetch_bytes: 0,
+//!     },
+//!     object_store,
+//!     batch_coordinator,
+//! )
+//! .await;
+//!
+//! let mut resp = consume_response.unwrap();
+//! let batch = resp.recv().await;
+//!
+//! println!("Batch: {:#?}", batch);
+//! ```
+#![deny(missing_docs)]
 #![deny(clippy::print_stdout)]
 #![deny(clippy::print_stderr)]
 #![deny(clippy::unwrap_used)]
@@ -7,10 +53,7 @@ pub mod batch_coordinator;
 pub mod messages;
 mod shared_log_segment;
 
-use std::{
-    collections::HashSet,
-    sync::Arc,
-};
+use std::{collections::HashSet, sync::Arc};
 
 use batch_coordinator::{BatchCoordinator, DeleteFilesRequest, FindBatchRequest, TopicIdPartition};
 // pub use broker::{Broker, BrokerConfiguration};
@@ -25,9 +68,9 @@ use messages::{
 pub mod error;
 
 use error::{RisklessError, RisklessResult};
+pub use object_store;
 use object_store::{ObjectStore, PutPayload, path::Path};
 use shared_log_segment::SharedLogSegment;
-pub use object_store;
 
 /// Handles a produce request by buffering the message for later persistence.
 ///
@@ -41,7 +84,7 @@ pub async fn produce(
 ) -> RisklessResult<()> {
     tracing::info!("Producing Request {:#?}.", request);
 
-collection.collect(request)?;
+    collection.collect(request)?;
 
     // let topic_id_partition = TopicIdPartition(request.topic.clone(), request.partition);
 

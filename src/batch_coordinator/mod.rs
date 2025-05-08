@@ -12,44 +12,67 @@ use std::time::SystemTime;
 
 use crate::messages::commit_batch_request::CommitBatchRequest;
 
+/// Merged Topic/Partition identification struc .
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
 pub struct TopicIdPartition(pub String, pub u64);
 
+/// The type of the timestamp given. 
 #[derive(Debug, Default, Clone)]
 pub enum TimestampType {
+    /// Default implementation.
     #[default]
     Dummy,
 }
 
+/// Request parameter to create a topic/partition combination.
 #[derive(Debug)]
 pub struct CreateTopicAndPartitionsRequest {
+    /// The ID of the topic.
     pub topic_id: uuid::Uuid,
+    /// The name of the topic. 
     pub topic_name: String,
+    /// How many partitions this topic should have.
     pub num_partitions: u32,
 }
 
+/// Response for CommitBatchRequest in order to commit a batch. 
 #[derive(Debug)]
 pub struct CommitBatchResponse {
+    /// The errors from this request.
     pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    /// Unknown.
     pub assigned_base_offset: u64,
+    /// Unknown.
     pub log_append_time: u64,
+    /// Unknown.
     pub log_start_offset: u64,
+    /// Unknown.
     pub is_duplicate: bool,
+    /// Unknown.
     pub request: CommitBatchRequest,
 }
 
+/// Request parameter for finding a specific offset in a topic/partiton. 
 #[derive(Debug)]
 pub struct FindBatchRequest {
+    /// ID of the topic/partition combination.
     pub topic_id_partition: TopicIdPartition,
+    /// The offset of the requested record.
     pub offset: u64,
+    /// How many bytes is the max that this response can hold.
     pub max_partition_fetch_bytes: u32,
 }
 
+/// The Response struct for the FindBatchRequest.
 #[derive(Debug, Clone)]
 pub struct FindBatchResponse {
+    /// The errors from this request.
     pub errors: Vec<String>, // TODO: fix this. This needs to be an Errors object.
+    /// The batches that were fetched using this response.
     pub batches: Vec<BatchInfo>,
+    /// Unknown.
     pub log_start_offset: u64,
+    /// Unknown.
     pub high_watermark: u64,
 }
 
