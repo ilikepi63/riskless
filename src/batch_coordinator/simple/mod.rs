@@ -15,10 +15,11 @@ use uuid::Uuid;
 use crate::{batch_coordinator::BatchInfo, error::RisklessResult, messages::CommitBatchRequest};
 
 use crate::batch_coordinator::{
-    BatchCoordinator, BatchMetadata, CommitBatchResponse, CreateTopicAndPartitionsRequest,
-    DeleteFilesRequest, DeleteRecordsRequest, DeleteRecordsResponse, FileToDelete,
-    FindBatchRequest, FindBatchResponse, ListOffsetsRequest, ListOffsetsResponse,
+    BatchMetadata, CommitBatchResponse, DeleteFilesRequest, DeleteRecordsRequest,
+    DeleteRecordsResponse, FileToDelete, FindBatchRequest, FindBatchResponse,
 };
+
+use super::{CommitFile, DeleteFiles, FindBatches};
 
 /// The SimpleBatchCoordinator is a default implementation that is
 ///
@@ -95,15 +96,7 @@ impl SimpleBatchCoordinator {
 }
 
 #[async_trait::async_trait]
-impl BatchCoordinator for SimpleBatchCoordinator {
-    async fn create_topic_and_partitions(
-        &self,
-        _requests: HashSet<CreateTopicAndPartitionsRequest>,
-    ) {
-        // This is not implemented for SimpleBatchCoordinator as the topics + partitions get
-        // created as they have data produced to them.
-    }
-
+impl CommitFile for SimpleBatchCoordinator {
     async fn commit_file(
         &self,
         object_key: [u8; 16],
@@ -163,7 +156,10 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
         commit_batch_responses
     }
+}
 
+#[async_trait::async_trait]
+impl FindBatches for SimpleBatchCoordinator {
     async fn find_batches(
         &self,
         find_batch_requests: Vec<FindBatchRequest>,
@@ -295,11 +291,10 @@ impl BatchCoordinator for SimpleBatchCoordinator {
 
         results
     }
+}
 
-    async fn list_offsets(&self, _requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse> {
-        todo!()
-    }
-
+#[async_trait::async_trait]
+impl DeleteFiles for SimpleBatchCoordinator {
     /// Simply returns errors as this implementation does not support this operation.
     async fn delete_records(
         &self,

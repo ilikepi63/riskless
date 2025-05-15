@@ -213,15 +213,9 @@ pub struct DeleteFilesRequest {
     pub object_key_paths: HashSet<String>,
 }
 
-/// The BatchCoordinator trait.
-///
-/// This structure is responsible for handling the indexing of offsets within topic's partitions.
-/// It is designed to be reimplementable for custom usecases depending on what the specific need is.
+/// Trait for enabling the creation of topics and partitions.
 #[async_trait::async_trait]
-pub trait BatchCoordinator
-where
-    Self: Send + Sync + std::fmt::Debug,
-{
+pub trait CreateTopicAndPartitions {
     /// This operation is called when a Diskless partition
     /// (or a topic with one or more partitions) is created in the cluster.
     /// The Batch Coordinator initializes the corresponding logs.
@@ -229,19 +223,17 @@ where
     /// # Errors
     /// Returns an error if an unexpected error occurs.
     async fn create_topic_and_partitions(&self, requests: HashSet<CreateTopicAndPartitionsRequest>);
+}
 
+/// This operation is called by a broker after uploading the
+/// shared log segment object to the object storage.
+#[async_trait::async_trait]
+pub trait CommitFile
+where
+    Self: Send + Sync + std::fmt::Debug,
+{
     /// This operation is called by a broker after uploading the
     /// shared log segment object to the object storage.
-    ///
-    /// The Batch Coordinator:
-    /// 1. Performs the necessary checks for idempotent produce.
-    /// 2. Accordingly increases the high watermark of the affected logs.
-    /// 3. Assigns offsets to the batches.
-    /// 4. Saves the batch and object metadata.
-    /// 5. Returns the result to the broker.
-    ///
-    /// # Errors
-    /// Returns an error if an unexpected error occurs.
     async fn commit_file(
         &self,
         object_key: [u8; 16],
@@ -249,26 +241,31 @@ where
         file_size: u64,
         batches: Vec<CommitBatchRequest>,
     ) -> Vec<CommitBatchResponse>;
+}
 
+/// Trait for Implementing fn find_batches.
+#[async_trait::async_trait]
+pub trait FindBatches
+where
+    Self: Send + Sync + std::fmt::Debug,
+{
     /// This operation is called by a broker when it needs to serve a Fetch request.
-    /// The Batch Coordinator collects the batch coordinates to satisfy
-    /// this request and sends the response back to the broker.
-    ///
-    /// # Errors
-    /// Returns an error if an unexpected error occurs.
     async fn find_batches(
         &self,
         find_batch_requests: Vec<FindBatchRequest>,
         fetch_max_bytes: u32,
     ) -> Vec<FindBatchResponse>;
+}
 
-    /// This operation allows the broker to get the information about log offsets:
-    /// earliest, latest, etc. The operation is a read-only operation.
-    ///
-    /// # Errors
-    /// Returns an error if an unexpected error occurs.
-    async fn list_offsets(&self, requests: Vec<ListOffsetsRequest>) -> Vec<ListOffsetsResponse>;
-
+/// The BatchCoordinator trait.
+///
+/// This structure is responsible for handling the indexing of offsets within topic's partitions.
+/// It is designed to be reimplementable for custom usecases depending on what the specific need is.
+#[async_trait::async_trait]
+pub trait DeleteFiles
+where
+    Self: Send + Sync + std::fmt::Debug,
+{
     /// This operation is called when a partition needs to be truncated by the user.
     /// The Batch Coordinator:
     /// 1. Modifies the log start offset for the affected partitions (logs).

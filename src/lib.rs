@@ -55,7 +55,9 @@ mod shared_log_segment;
 
 use std::{collections::HashSet, sync::Arc};
 
-use batch_coordinator::{BatchCoordinator, DeleteFilesRequest, FindBatchRequest, TopicIdPartition};
+use batch_coordinator::{
+    CommitFile, DeleteFiles, DeleteFilesRequest, FindBatchRequest, FindBatches, TopicIdPartition,
+};
 use bytes::Bytes;
 use messages::{
     CommitBatchRequest, ConsumeBatch, ConsumeRequest, ConsumeResponse, ProduceRequestCollection,
@@ -72,7 +74,7 @@ use shared_log_segment::SharedLogSegment;
 pub async fn flush(
     reqs: ProduceRequestCollection,
     object_storage: Arc<dyn ObjectStore>,
-    batch_coordinator: Arc<dyn BatchCoordinator>,
+    batch_coordinator: Arc<dyn CommitFile>,
 ) -> RisklessResult<Vec<ProduceResponse>> {
     tracing::info!("Produce Requests: {:#?}", reqs);
 
@@ -120,7 +122,7 @@ pub async fn flush(
 pub async fn consume(
     request: ConsumeRequest,
     object_storage: Arc<dyn ObjectStore>,
-    batch_coordinator: Arc<dyn BatchCoordinator>,
+    batch_coordinator: Arc<dyn FindBatches>,
 ) -> RisklessResult<tokio::sync::mpsc::Receiver<ConsumeResponse>> {
     let batch_responses = batch_coordinator
         .find_batches(
@@ -207,7 +209,7 @@ pub async fn consume(
 #[tracing::instrument(skip_all, name = "delete_records")]
 pub async fn delete_record(
     request: crate::messages::DeleteRecordsRequest,
-    batch_coordinator: Arc<dyn BatchCoordinator>,
+    batch_coordinator: Arc<dyn DeleteFiles>,
 ) -> RisklessResult<crate::messages::DeleteRecordsResponse> {
     let result = batch_coordinator
         .delete_records(vec![request.try_into().map_err(|e| {
@@ -232,7 +234,7 @@ pub async fn delete_record(
 /// The interval at which this happens is delegated to the implementor.
 #[tracing::instrument(skip_all, name = "heartbeat_permanent_delete")]
 pub async fn scan_and_permanently_delete_records(
-    batch_coordinator: Arc<dyn BatchCoordinator>,
+    batch_coordinator: Arc<dyn DeleteFiles>,
     object_store: Arc<dyn ObjectStore>,
 ) -> RisklessResult<()> {
     let files_to_delete = batch_coordinator.get_files_to_delete().await;
