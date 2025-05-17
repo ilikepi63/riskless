@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 #[tokio::main]
 async fn main() {
     let object_store =
-        Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").unwrap());
+        Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").expect(""));
     let batch_coordinator = Arc::new(SimpleBatchCoordinator::new("index".to_string()));
 
     let col = Arc::new(RwLock::new(ProduceRequestCollection::new()));
@@ -27,7 +27,7 @@ async fn main() {
                 partition: 1,
                 data: "hello".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
     });
 
     let col_flush = col.clone();
@@ -45,7 +45,7 @@ async fn main() {
 
         let produce_response = flush(new_ref, flush_object_store_ref, flush_batch_coord_ref)
             .await
-            .unwrap();
+            .expect("");
 
         assert_eq!(produce_response.len(), 1);
     });
@@ -66,7 +66,7 @@ async fn main() {
 
     assert!(consume_response.is_ok());
 
-    let mut resp = consume_response.unwrap();
+    let mut resp = consume_response.expect("");
     let batch = resp.recv().await;
 
     println!("Batch: {:#?}", batch);

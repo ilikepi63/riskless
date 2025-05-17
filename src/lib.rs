@@ -76,7 +76,6 @@ pub async fn flush(
     object_storage: Arc<dyn ObjectStore>,
     batch_coordinator: Arc<dyn CommitFile>,
 ) -> RisklessResult<Vec<ProduceResponse>> {
-
     let reqs: SharedLogSegment = reqs.try_into()?;
 
     let batch_coords = reqs.get_batch_coords().clone();
@@ -107,7 +106,6 @@ pub async fn flush(
                 .collect::<Vec<_>>(),
         )
         .await;
-
 
     Ok(put_result
         .iter()

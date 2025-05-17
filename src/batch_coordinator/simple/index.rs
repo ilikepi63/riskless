@@ -96,8 +96,11 @@ mod tests {
         // Check the written bytes
         assert_eq!(buf.len(), 16 + 8 + 4); // UUID + u64 + u32
         assert_eq!(&buf[0..16], uuid.as_bytes());
-        assert_eq!(u64::from_be_bytes(buf[16..24].try_into().unwrap()), offset);
-        assert_eq!(u32::from_be_bytes(buf[24..28].try_into().unwrap()), size);
+        assert_eq!(
+            u64::from_be_bytes(buf[16..24].try_into().expect("")),
+            offset
+        );
+        assert_eq!(u32::from_be_bytes(buf[24..28].try_into().expect("")), size);
     }
 
     #[test]
@@ -111,7 +114,7 @@ mod tests {
         bytes.extend_from_slice(&offset.to_be_bytes());
         bytes.extend_from_slice(&size.to_be_bytes());
 
-        let index = Index::try_from(bytes.as_slice()).unwrap();
+        let index = Index::try_from(bytes.as_slice()).expect("");
 
         assert_eq!(index.object_key, uuid);
         assert_eq!(index.offset, offset);
@@ -140,7 +143,7 @@ mod tests {
         let mut buf = BytesMut::new();
         original_clone.write(&mut buf);
 
-        let reconstructed = Index::try_from(buf.as_ref()).unwrap();
+        let reconstructed = Index::try_from(buf.as_ref()).expect("");
 
         assert_eq!(reconstructed.object_key, original.object_key);
         assert_eq!(reconstructed.offset, original.offset);

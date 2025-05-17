@@ -31,15 +31,15 @@ mod tests {
         let mut object_store_path = std::env::temp_dir();
         object_store_path.push(uuid::Uuid::new_v4().to_string());
 
-        std::fs::create_dir(&batch_coord_path).unwrap();
-        std::fs::create_dir(&object_store_path).unwrap();
+        std::fs::create_dir(&batch_coord_path).expect("");
+        std::fs::create_dir(&object_store_path).expect("");
 
         (batch_coord_path, object_store_path)
     }
 
     fn tear_down_dirs(batch_coord: PathBuf, object_store: PathBuf) {
-        std::fs::remove_dir_all(&batch_coord).unwrap();
-        std::fs::remove_dir_all(&object_store).unwrap();
+        std::fs::remove_dir_all(&batch_coord).expect("");
+        std::fs::remove_dir_all(&object_store).expect("");
     }
 
     #[tokio::test]
@@ -48,7 +48,7 @@ mod tests {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let object_store = Arc::new(
-            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).expect(""),
         );
         let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
             batch_coord_path.to_string_lossy().to_string(),
@@ -68,7 +68,7 @@ mod tests {
                     partition: 1,
                     data: "hello".as_bytes().to_vec(),
                 })
-                .unwrap();
+                .expect("");
         });
 
         let col_flush = col.clone();
@@ -86,7 +86,7 @@ mod tests {
 
             let produce_response = flush(new_ref, flush_object_store_ref, flush_batch_coord_ref)
                 .await
-                .unwrap();
+                .expect("");
 
             assert_eq!(produce_response.len(), 1);
         });
@@ -107,12 +107,12 @@ mod tests {
 
         assert!(consume_response.is_ok());
 
-        let resp = consume_response.unwrap();
+        let resp = consume_response.expect("");
         let batches = await_all_receiver(resp).await;
 
         assert_eq!(batches.len(), 1);
         assert_eq!(
-            batches.first().unwrap().batches.first().unwrap().data,
+            batches.first().expect("").batches.first().expect("").data,
             bytes::Bytes::from_static(b"hello")
         );
 
@@ -125,7 +125,7 @@ mod tests {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let object_store = Arc::new(
-            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).expect(""),
         );
         let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
             batch_coord_path.to_string_lossy().to_string(),
@@ -139,11 +139,11 @@ mod tests {
             partition: 1,
             data: "hello".as_bytes().to_vec(),
         })
-        .unwrap();
+        .expect("");
 
         let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
         assert_eq!(produce_response.len(), 1);
 
@@ -161,12 +161,12 @@ mod tests {
 
         assert!(consume_response.is_ok());
 
-        let resp = consume_response.unwrap();
+        let resp = consume_response.expect("");
         let batches = await_all_receiver(resp).await;
 
         assert_eq!(batches.len(), 1);
         assert_eq!(
-            batches.first().unwrap().batches.first().unwrap().data,
+            batches.first().expect("").batches.first().expect("").data,
             bytes::Bytes::from_static(b"hello")
         );
 
@@ -179,7 +179,7 @@ mod tests {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let object_store = Arc::new(
-            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).expect(""),
         );
 
         let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
@@ -195,13 +195,13 @@ mod tests {
             data: "hello".as_bytes().to_vec(),
         });
 
-        result.unwrap();
+        result.expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 1);
         assert_eq!(result.errors.len(), 0);
@@ -214,13 +214,13 @@ mod tests {
             partition: 2,
             data: "partition-two".as_bytes().to_vec(),
         });
-        result.unwrap();
+        result.expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 2);
         assert_eq!(result.errors.len(), 0);
@@ -233,13 +233,13 @@ mod tests {
             partition: 3,
             data: "partition-three".as_bytes().to_vec(),
         });
-        result.unwrap();
+        result.expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 3);
         assert_eq!(result.errors.len(), 0);
@@ -255,11 +255,11 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
 
         let consume_response = consume(
             ConsumeRequest {
@@ -272,18 +272,18 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
         assert_eq!(
             consume_response
                 .first()
-                .unwrap()
+                .expect("")
                 .batches
                 .first()
-                .unwrap()
+                .expect("")
                 .data,
             bytes::Bytes::from_static(b"partition-two")
         );
@@ -299,18 +299,18 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
         assert_eq!(
             consume_response
                 .first()
-                .unwrap()
+                .expect("")
                 .batches
                 .first()
-                .unwrap()
+                .expect("")
                 .data,
             bytes::Bytes::from_static(b"partition-three")
         );
@@ -324,7 +324,7 @@ mod tests {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let object_store = Arc::new(
-            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).expect(""),
         );
 
         let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
@@ -340,20 +340,20 @@ mod tests {
                 partition: 1,
                 data: "hello".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         tracing::info!(
             "{:#?}",
             std::fs::read_dir(&batch_coord_path)
-                .unwrap()
+                .expect("")
                 .collect::<Vec<_>>()
         );
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 1);
 
@@ -370,19 +370,19 @@ mod tests {
                 partition: 1,
                 data: "partition-two".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         tracing::info!(
             "{:#?}",
             std::fs::read_dir(&batch_coord_path)
-                .unwrap()
+                .expect("")
                 .collect::<Vec<_>>()
         );
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
-        let result = result.first().unwrap();
+            .expect("");
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 2);
 
@@ -399,20 +399,20 @@ mod tests {
                 partition: 1,
                 data: "partition-three".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         tracing::info!(
             "{:#?}",
             std::fs::read_dir(&batch_coord_path)
-                .unwrap()
+                .expect("")
                 .collect::<Vec<_>>()
         );
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 3);
         assert_eq!(result.errors.len(), 0);
@@ -428,11 +428,11 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
 
         let consume_response = consume(
             ConsumeRequest {
@@ -445,18 +445,18 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
         assert_eq!(
             consume_response
                 .first()
-                .unwrap()
+                .expect("")
                 .batches
                 .first()
-                .unwrap()
+                .expect("")
                 .data,
             bytes::Bytes::from_static(b"partition-two")
         );
@@ -472,18 +472,18 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
         assert_eq!(
             consume_response
                 .first()
-                .unwrap()
+                .expect("")
                 .batches
                 .first()
-                .unwrap()
+                .expect("")
                 .data,
             bytes::Bytes::from_static(b"partition-three")
         );
@@ -497,7 +497,7 @@ mod tests {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let object_store = Arc::new(
-            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).expect(""),
         );
 
         let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
@@ -513,18 +513,18 @@ mod tests {
                 partition: 1,
                 data: "hello".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         tracing::info!(
             "{:#?}",
             std::fs::read_dir(&batch_coord_path)
-                .unwrap()
+                .expect("")
                 .collect::<Vec<_>>()
         );
 
@@ -543,13 +543,13 @@ mod tests {
                 partition: 1,
                 data: "example-topic-partition-one-first".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 2);
 
@@ -566,13 +566,13 @@ mod tests {
                 partition: 1,
                 data: "example-topic-partition-one-second".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 3);
         assert_eq!(result.errors.len(), 0);
@@ -588,13 +588,13 @@ mod tests {
                 partition: 1,
                 data: "example-topic-two-partition-one-first".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 4);
 
@@ -611,13 +611,13 @@ mod tests {
                 partition: 1,
                 data: "example-topic-two-partition-one-second".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 5);
 
@@ -634,13 +634,13 @@ mod tests {
                 partition: 2,
                 data: "example-topic-two-partition-two-first".as_bytes().to_vec(),
             })
-            .unwrap();
+            .expect("");
 
         let result = flush(collection, object_store.clone(), batch_coordinator.clone())
             .await
-            .unwrap();
+            .expect("");
 
-        let result = result.first().unwrap();
+        let result = result.first().expect("");
 
         assert_eq!(result.request_id, 6);
         assert_eq!(result.errors.len(), 0);
@@ -656,11 +656,11 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
 
         let consume_response = consume(
             ConsumeRequest {
@@ -673,18 +673,18 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
         assert_eq!(
             consume_response
                 .first()
-                .unwrap()
+                .expect("")
                 .batches
                 .first()
-                .unwrap()
+                .expect("")
                 .data,
             bytes::Bytes::from_static(b"example-topic-partition-one-first")
         );
@@ -700,18 +700,18 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
         assert_eq!(
             consume_response
                 .first()
-                .unwrap()
+                .expect("")
                 .batches
                 .first()
-                .unwrap()
+                .expect("")
                 .data,
             bytes::Bytes::from_static(b"example-topic-partition-one-second")
         );
@@ -727,11 +727,11 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
 
         let consume_response = consume(
             ConsumeRequest {
@@ -744,18 +744,18 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
         assert_eq!(
             consume_response
                 .first()
-                .unwrap()
+                .expect("")
                 .batches
                 .first()
-                .unwrap()
+                .expect("")
                 .data,
             bytes::Bytes::from_static(b"example-topic-two-partition-two-first")
         );
@@ -771,18 +771,18 @@ mod tests {
             batch_coordinator.clone(),
         )
         .await
-        .unwrap();
+        .expect("");
 
         let consume_response = await_all_receiver(consume_response).await;
 
-        assert_eq!(consume_response.first().unwrap().batches.len(), 1);
+        assert_eq!(consume_response.first().expect("").batches.len(), 1);
         assert_eq!(
             consume_response
                 .first()
-                .unwrap()
+                .expect("")
                 .batches
                 .first()
-                .unwrap()
+                .expect("")
                 .data,
             bytes::Bytes::from_static(b"example-topic-two-partition-one-second")
         );
@@ -811,7 +811,7 @@ mod tests {
 
         assert!(result.is_ok());
 
-        let result = result.unwrap();
+        let result = result.expect("");
 
         // Not really ideal test scenarios.
         assert_eq!(result.errors.len(), 1);
@@ -824,7 +824,7 @@ mod tests {
         let (batch_coord_path, object_store_path) = set_up_dirs();
 
         let object_store = Arc::new(
-            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).unwrap(),
+            object_store::local::LocalFileSystem::new_with_prefix(&object_store_path).expect(""),
         );
 
         let batch_coordinator = Arc::new(SimpleBatchCoordinator::new(
@@ -833,7 +833,7 @@ mod tests {
 
         scan_and_permanently_delete_records(batch_coordinator, object_store)
             .await
-            .unwrap();
+            .expect("");
 
         tear_down_dirs(batch_coord_path, object_store_path);
     }

@@ -137,7 +137,7 @@ mod tests {
         let collection = ProduceRequestCollection::new();
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());
-        let segment = result.unwrap();
+        let segment = result.expect("");
         assert_eq!(segment.0.len(), 0); // No batch coordinates
         assert_eq!(segment.1.len(), SharedLogSegmentHeaderV1::size()); // Empty buffer
     }
@@ -155,7 +155,7 @@ mod tests {
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());
-        let segment = result.unwrap();
+        let segment = result.expect("");
 
         assert_eq!(segment.0.len(), 1); // One batch coordinate
         assert_eq!(segment.1.len(), SharedLogSegmentHeaderV1::size() + 3); // 3 bytes of data
@@ -165,11 +165,11 @@ mod tests {
         assert_eq!(coord.partition, 0);
         assert_eq!(
             coord.base_offset,
-            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+            SharedLogSegmentHeaderV1::size().try_into().expect("")
         );
         assert_eq!(
             coord.offset,
-            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+            SharedLogSegmentHeaderV1::size().try_into().expect("")
         ); // buf.len() - 1 (3-1=2)
 
         let expected_bytes = [
@@ -212,7 +212,7 @@ mod tests {
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());
-        let segment = result.unwrap();
+        let segment = result.expect("");
 
         assert_eq!(segment.0.len(), 3); // Three batch coordinates
         assert_eq!(segment.1.len(), 9 + SharedLogSegmentHeaderV1::size()); // 3 + 2 + 4 bytes of data
@@ -257,7 +257,7 @@ mod tests {
 
         let result = SharedLogSegment::try_from(collection);
         assert!(result.is_ok());
-        let segment = result.unwrap();
+        let segment = result.expect("");
 
         assert_eq!(segment.0.len(), 1);
         assert_eq!(segment.1.len(), 10000 + SharedLogSegmentHeaderV1::size());
@@ -265,7 +265,7 @@ mod tests {
         let coord = &segment.0[0];
         assert_eq!(
             coord.offset,
-            SharedLogSegmentHeaderV1::size().try_into().unwrap()
+            SharedLogSegmentHeaderV1::size().try_into().expect("")
         ); // 10000 - 1
         assert_eq!(segment.1.as_ref(), expected_large_data.as_slice());
 

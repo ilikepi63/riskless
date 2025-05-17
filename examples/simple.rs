@@ -9,7 +9,7 @@ use riskless::{
 #[tokio::main]
 async fn main() {
     let object_store =
-        Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").unwrap());
+        Arc::new(object_store::local::LocalFileSystem::new_with_prefix("data").expect(""));
     let batch_coordinator = Arc::new(SimpleBatchCoordinator::new("index".to_string()));
 
     let col = ProduceRequestCollection::new();
@@ -20,11 +20,11 @@ async fn main() {
         partition: 1,
         data: "hello".as_bytes().to_vec(),
     })
-    .unwrap();
+    .expect("");
 
     let produce_response = flush(col, object_store.clone(), batch_coordinator.clone())
         .await
-        .unwrap();
+        .expect("");
 
     assert_eq!(produce_response.len(), 1);
 
@@ -40,7 +40,7 @@ async fn main() {
     )
     .await;
 
-    let mut resp = consume_response.unwrap();
+    let mut resp = consume_response.expect("");
     let batch = resp.recv().await;
 
     println!("Batch: {:#?}", batch);
