@@ -40,11 +40,7 @@ impl TryFrom<&[u8]> for Index {
             return Err(RisklessError::Unknown); // TODO make an error for this.; 
         }
 
-        tracing::info!("{:#?}", &value[0..16]);
-
         let object_key = Uuid::from_slice(&value[0..16])?;
-
-        tracing::info!("{:#?}", &value[17..24]);
 
         let offset = u64::from_be_bytes(value[16..24].try_into()?);
 
@@ -115,8 +111,6 @@ mod tests {
         bytes.extend_from_slice(&offset.to_be_bytes());
         bytes.extend_from_slice(&size.to_be_bytes());
 
-        tracing::info!("{:#?}", bytes);
-
         let index = Index::try_from(bytes.as_slice()).unwrap();
 
         assert_eq!(index.object_key, uuid);
@@ -129,8 +123,6 @@ mod tests {
         let bytes = [0u8; 15]; // Less than needed (16 + 8 + 4 = 28 bytes)
 
         let result = Index::try_from(bytes.as_slice());
-
-        tracing::info!("{:#?}", result);
 
         assert!(result.is_err());
     }

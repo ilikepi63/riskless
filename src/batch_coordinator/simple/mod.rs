@@ -66,8 +66,6 @@ impl SimpleBatchCoordinator {
 
     /// Opens or creates the underlying file depending on it's existence.
     fn open_or_create_file(current_partition_file: &PathBuf) -> RisklessResult<File> {
-        tracing::info!("File {:#?} exists.", current_partition_file);
-
         let file = match current_partition_file.exists() {
             true => {
                 let mut open_opts = OpenOptions::new();
@@ -76,14 +74,8 @@ impl SimpleBatchCoordinator {
 
                 open_opts.open(current_partition_file)
             }
-            false => {
-                tracing::info!("Actually doing this..");
-                std::fs::File::create(current_partition_file)
-            }
+            false => std::fs::File::create(current_partition_file),
         };
-
-        tracing::info!("Result from file: {:#?}", file);
-
         Ok(file?)
     }
 
@@ -118,8 +110,6 @@ impl CommitFile for SimpleBatchCoordinator {
 
             let file = Self::open_or_create_file(current_partition_file);
 
-            tracing::info!("Result from file: {:#?}", file);
-
             match file {
                 Ok(mut file) => {
                     let offset = batch.byte_offset;
@@ -148,8 +138,6 @@ impl CommitFile for SimpleBatchCoordinator {
                         is_duplicate: false,
                         request: batch,
                     });
-                    tracing::info!("Error when creating index file: {:#?}", err);
-                    // TODO: File error and return to result.
                 }
             }
         }
@@ -181,7 +169,6 @@ impl FindBatches for SimpleBatchCoordinator {
 
             match file {
                 Ok(mut file) => {
-                    tracing::info!("Reading from position: {:#?}", request.offset);
 
                     let size_in_u64: u64 = match Index::packed_size().try_into() {
                         Ok(s) => s,
@@ -246,7 +233,6 @@ impl FindBatches for SimpleBatchCoordinator {
 
                     match index {
                         Ok(index) => {
-                            tracing::info!("Received Index: {:#?}", index);
 
                             results.push(FindBatchResponse {
                                 errors: vec![],
@@ -283,8 +269,6 @@ impl FindBatches for SimpleBatchCoordinator {
                     }
                 }
                 Err(err) => {
-                    tracing::info!("Error when creating index file: {:#?}", err);
-                    // TODO: File error and return to result.
                 }
             }
         }
@@ -508,11 +492,6 @@ mod tests {
         // Commit the file
         coordinator.commit_file(object_key, 1, 100, batches).await;
 
-        tracing::info!(
-            "{:#?}",
-            std::fs::read_dir(&whole_dir).unwrap().collect::<Vec<_>>()
-        );
-
         // File should now exist
         assert!(expected_file_path.exists());
 
@@ -673,11 +652,7 @@ mod tests {
 
         index_path.push(&topic);
 
-        tracing::info!("{:#?}", std::fs::read_dir(&index_path)?.collect::<Vec<_>>());
-
         index_path.push(format!("{:0>20}.index", partition.to_string()));
-
-        tracing::info!("{:#?}", index_path);
 
         let data = std::fs::read(index_path)?;
 

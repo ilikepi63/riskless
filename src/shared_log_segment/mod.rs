@@ -98,8 +98,6 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
 
                 buf.put_slice(&req.data);
 
-                tracing::info!("{}", buf.len());
-
                 batch_coords.push(BatchCoordinate {
                     topic: req.topic.clone(),
                     partition: req.partition,
