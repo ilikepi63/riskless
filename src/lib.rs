@@ -76,8 +76,6 @@ pub async fn flush(
     object_storage: Arc<dyn ObjectStore>,
     batch_coordinator: Arc<dyn CommitFile>,
 ) -> RisklessResult<Vec<ProduceResponse>> {
-    tracing::info!("Produce Requests: {:#?}", reqs);
-
     let reqs: SharedLogSegment = reqs.try_into()?;
 
     let batch_coords = reqs.get_batch_coords().clone();
@@ -109,8 +107,6 @@ pub async fn flush(
         )
         .await;
 
-    tracing::info!("Put Result: {:#?}", put_result);
-
     Ok(put_result
         .iter()
         .map(ProduceResponse::from)
@@ -118,7 +114,6 @@ pub async fn flush(
 }
 
 /// Handles a consume request by retrieving messages from object storage.
-#[tracing::instrument(skip_all, name = "consume")]
 pub async fn consume(
     request: ConsumeRequest,
     object_storage: Arc<dyn ObjectStore>,
@@ -159,8 +154,6 @@ pub async fn consume(
             let result = match get_object_result {
                 Ok(get_result) => {
                     if let Ok(b) = get_result.bytes().await {
-                        tracing::info!("Retrieved Bytes: {:#?}", b);
-
                         // Retrieve the current fetch Responses by name.
                         let batch_responses_for_object = batch_responses
                             .iter()

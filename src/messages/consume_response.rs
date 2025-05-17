@@ -42,8 +42,6 @@ impl TryFrom<(FindBatchResponse, &BatchInfo, &Bytes)> for ConsumeBatch {
             + Into::<u64>::into(batch_info.metadata.byte_size))
         .try_into()?;
 
-        tracing::info!("START: {} END: {} ", start, end);
-
         let data = bytes.slice(start..end);
 
         let batch = ConsumeBatch {

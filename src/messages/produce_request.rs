@@ -60,8 +60,6 @@ impl ProduceRequestCollection {
 
     /// Collect a produce request into this struct.
     pub fn collect(&self, req: ProduceRequest) -> RisklessResult<()> {
-        tracing::info!("Collecting: {:#?}", req);
-
         let topic_id_partition = TopicIdPartition(req.topic.clone(), req.partition);
 
         let entry = self.inner.entry(topic_id_partition);

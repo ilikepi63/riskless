@@ -66,8 +66,6 @@ impl SimpleBatchCoordinator {
 
     /// Opens or creates the underlying file depending on it's existence.
     fn open_or_create_file(current_partition_file: &PathBuf) -> RisklessResult<File> {
-        tracing::info!("File {:#?} exists.", current_partition_file);
-
         let file = match current_partition_file.exists() {
             true => {
                 let mut open_opts = OpenOptions::new();
@@ -76,14 +74,8 @@ impl SimpleBatchCoordinator {
 
                 open_opts.open(current_partition_file)
             }
-            false => {
-                tracing::info!("Actually doing this..");
-                std::fs::File::create(current_partition_file)
-            }
+            false => std::fs::File::create(current_partition_file),
         };
-
-        tracing::info!("Result from file: {:#?}", file);
-
         Ok(file?)
     }
 
@@ -118,8 +110,6 @@ impl CommitFile for SimpleBatchCoordinator {
 
             let file = Self::open_or_create_file(current_partition_file);
 
-            tracing::info!("Result from file: {:#?}", file);
-
             match file {
                 Ok(mut file) => {
                     let offset = batch.byte_offset;
@@ -148,8 +138,6 @@ impl CommitFile for SimpleBatchCoordinator {
                         is_duplicate: false,
                         request: batch,
                     });
-                    tracing::info!("Error when creating index file: {:#?}", err);
-                    // TODO: File error and return to result.
                 }
             }
         }
@@ -181,8 +169,6 @@ impl FindBatches for SimpleBatchCoordinator {
 
             match file {
                 Ok(mut file) => {
-                    tracing::info!("Reading from position: {:#?}", request.offset);
-
                     let size_in_u64: u64 = match Index::packed_size().try_into() {
                         Ok(s) => s,
                         Err(err) => {
@@ -246,8 +232,6 @@ impl FindBatches for SimpleBatchCoordinator {
 
                     match index {
                         Ok(index) => {
-                            tracing::info!("Received Index: {:#?}", index);
-
                             results.push(FindBatchResponse {
                                 errors: vec![],
                                 batches: vec![BatchInfo {
@@ -282,10 +266,7 @@ impl FindBatches for SimpleBatchCoordinator {
                         }
                     }
                 }
-                Err(err) => {
-                    tracing::info!("Error when creating index file: {:#?}", err);
-                    // TODO: File error and return to result.
-                }
+                Err(_err) => {}
             }
         }
 
@@ -338,13 +319,13 @@ mod tests {
     fn set_up_dirs() -> PathBuf {
         let mut batch_coord_path = std::env::temp_dir();
         batch_coord_path.push(uuid::Uuid::new_v4().to_string());
-        std::fs::create_dir(&batch_coord_path).unwrap();
+        std::fs::create_dir(&batch_coord_path).expect("");
 
         batch_coord_path
     }
 
     fn tear_down_dirs(batch_coord: PathBuf) {
-        std::fs::remove_dir_all(&batch_coord).unwrap();
+        std::fs::remove_dir_all(&batch_coord).expect("");
     }
 
     #[test]
@@ -361,7 +342,7 @@ mod tests {
     fn test_topic_dir_creates_directory_if_not_exists() {
         let temp_dir = set_up_dirs();
 
-        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().expect("").to_string());
 
         let topic = "test_topic".to_string();
 
@@ -383,13 +364,13 @@ mod tests {
     fn test_topic_dir_uses_existing_directory() {
         let temp_dir = set_up_dirs();
 
-        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().expect("").to_string());
 
         let topic = "existing_topic".to_string();
 
         // Create the directory manually first
         let expected_path = temp_dir.join(&topic);
-        fs::create_dir(&expected_path).unwrap();
+        fs::create_dir(&expected_path).expect("");
 
         // Call topic_dir
         let result = coordinator.topic_dir(topic.clone());
@@ -408,7 +389,7 @@ mod tests {
             SimpleBatchCoordinator::partition_index_file_from_topic_dir(&mut topic_dir, partition);
 
         assert_eq!(
-            result.to_str().unwrap(),
+            result.to_str().expect(""),
             "test_topic/00000000000000000042.index"
         );
     }
@@ -437,7 +418,7 @@ mod tests {
         let file_path = temp_dir.join("existing_file.index");
 
         // Create the file first
-        File::create(&file_path).unwrap();
+        File::create(&file_path).expect("");
 
         // Try to open
         let result = SimpleBatchCoordinator::open_or_create_file(&file_path);
@@ -451,7 +432,7 @@ mod tests {
         let file_path = temp_dir.join("test_open_file.index");
 
         // Create the file first
-        File::create(&file_path).unwrap();
+        File::create(&file_path).expect("");
 
         // Try to open
         let result = SimpleBatchCoordinator::open_file(&file_path);
@@ -475,7 +456,7 @@ mod tests {
     async fn test_commit_file_creates_index_file() {
         let temp_dir = set_up_dirs();
 
-        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().expect("").to_string());
 
         let whole_dir = temp_dir.clone();
 
@@ -508,18 +489,13 @@ mod tests {
         // Commit the file
         coordinator.commit_file(object_key, 1, 100, batches).await;
 
-        tracing::info!(
-            "{:#?}",
-            std::fs::read_dir(&whole_dir).unwrap().collect::<Vec<_>>()
-        );
-
         // File should now exist
         assert!(expected_file_path.exists());
 
         // Verify file contents
-        let mut file = File::open(&expected_file_path).unwrap();
+        let mut file = File::open(&expected_file_path).expect("");
         let mut buf = [0u8; 28]; // Assuming Index is 28 bytes
-        file.read_exact(&mut buf).unwrap();
+        file.read_exact(&mut buf).expect("");
 
         // You might want to add more specific assertions about the contents
         assert_ne!(buf, [0u8; 28]);
@@ -530,7 +506,7 @@ mod tests {
     async fn test_find_batches_reads_correct_data() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = set_up_dirs();
 
-        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().expect("").to_string());
 
         // TODO: This behaviour likely needs to be implemented in the SimpleBatchCoordinator.
         let data_path = temp_dir.clone();
@@ -594,7 +570,7 @@ mod tests {
     async fn test_multiple_writes() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = set_up_dirs();
 
-        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().expect("").to_string());
 
         // TODO: This behaviour likely needs to be implemented in the SimpleBatchCoordinator.
         let data_path = temp_dir.clone();
@@ -673,11 +649,7 @@ mod tests {
 
         index_path.push(&topic);
 
-        tracing::info!("{:#?}", std::fs::read_dir(&index_path)?.collect::<Vec<_>>());
-
         index_path.push(format!("{:0>20}.index", partition.to_string()));
-
-        tracing::info!("{:#?}", index_path);
 
         let data = std::fs::read(index_path)?;
 
@@ -731,7 +703,7 @@ mod tests {
     async fn test_find_batches_handles_missing_file() {
         let temp_dir = set_up_dirs();
 
-        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().unwrap().to_string());
+        let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().expect("").to_string());
 
         let find_requests = vec![FindBatchRequest {
             topic_id_partition: TopicIdPartition("nonexistent_topic".to_string(), 1),
