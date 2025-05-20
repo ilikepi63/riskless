@@ -57,7 +57,7 @@ impl SimpleBatchCoordinator {
     /// Retrieves the directory of the given topic/partition.
     fn partition_index_file_from_topic_dir<'a>(
         topic_dir: &'a mut PathBuf,
-        partition: &'a Vec<u8>,
+        partition: &'a [u8],
     ) -> &'a mut PathBuf {
         topic_dir.push(format!(
             "{:0>20}.index",
@@ -653,7 +653,10 @@ mod tests {
 
         index_path.push(&topic);
 
-        index_path.push(format!("{:0>20}.index", partition.iter().map(|b| b.to_string()).collect::<String>()));
+        index_path.push(format!(
+            "{:0>20}.index",
+            partition.iter().map(|b| b.to_string()).collect::<String>()
+        ));
 
         let data = std::fs::read(index_path)?;
 
@@ -710,7 +713,10 @@ mod tests {
         let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().expect("").to_string());
 
         let find_requests = vec![FindBatchRequest {
-            topic_id_partition: TopicIdPartition("nonexistent_topic".to_string(), Vec::from(&1_u8.to_be_bytes())),
+            topic_id_partition: TopicIdPartition(
+                "nonexistent_topic".to_string(),
+                Vec::from(&1_u8.to_be_bytes()),
+            ),
             offset: 0,
             max_partition_fetch_bytes: 1024,
         }];
