@@ -65,7 +65,7 @@ mod tests {
                 .collect(ProduceRequest {
                     request_id: 1,
                     topic: "example-topic".to_string(),
-                    partition: 1,
+                    partition: Vec::from(&1_u8.to_be_bytes()),
                     data: "hello".as_bytes().to_vec(),
                 })
                 .expect("");
@@ -96,7 +96,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -136,7 +136,7 @@ mod tests {
         col.collect(ProduceRequest {
             request_id: 1,
             topic: "example-topic".to_string(),
-            partition: 1,
+            partition: Vec::from(&1_u8.to_be_bytes()),
             data: "hello".as_bytes().to_vec(),
         })
         .expect("");
@@ -150,7 +150,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -191,7 +191,7 @@ mod tests {
         let result = collection.collect(ProduceRequest {
             request_id: 1,
             topic: "example-topic".to_string(),
-            partition: 1,
+            partition: Vec::from(&1_u8.to_be_bytes()),
             data: "hello".as_bytes().to_vec(),
         });
 
@@ -211,7 +211,7 @@ mod tests {
         let result = collection.collect(ProduceRequest {
             request_id: 2,
             topic: "example-topic".to_string(),
-            partition: 2,
+            partition: Vec::from(&2_u8.to_be_bytes()),
             data: "partition-two".as_bytes().to_vec(),
         });
         result.expect("");
@@ -230,7 +230,7 @@ mod tests {
         let result = collection.collect(ProduceRequest {
             request_id: 3,
             topic: "example-topic".to_string(),
-            partition: 3,
+            partition: Vec::from(&3_u8.to_be_bytes()),
             data: "partition-three".as_bytes().to_vec(),
         });
         result.expect("");
@@ -247,7 +247,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -264,7 +264,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 2,
+                partition: Vec::from(&2_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -291,7 +291,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 3,
+                partition: Vec::from(&3_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -337,7 +337,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 1,
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 data: "hello".as_bytes().to_vec(),
             })
             .expect("");
@@ -367,7 +367,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 2,
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 data: "partition-two".as_bytes().to_vec(),
             })
             .expect("");
@@ -396,7 +396,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 3,
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 data: "partition-three".as_bytes().to_vec(),
             })
             .expect("");
@@ -420,7 +420,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -437,7 +437,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 1,
                 max_partition_fetch_bytes: 0,
             },
@@ -464,7 +464,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 2,
                 max_partition_fetch_bytes: 0,
             },
@@ -510,7 +510,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 1,
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 data: "hello".as_bytes().to_vec(),
             })
             .expect("");
@@ -540,7 +540,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 2,
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 data: "example-topic-partition-one-first".as_bytes().to_vec(),
             })
             .expect("");
@@ -563,7 +563,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 3,
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 data: "example-topic-partition-one-second".as_bytes().to_vec(),
             })
             .expect("");
@@ -585,7 +585,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 4,
                 topic: "example-topic-two".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 data: "example-topic-two-partition-one-first".as_bytes().to_vec(),
             })
             .expect("");
@@ -608,7 +608,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 5,
                 topic: "example-topic-two".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 data: "example-topic-two-partition-one-second".as_bytes().to_vec(),
             })
             .expect("");
@@ -631,7 +631,7 @@ mod tests {
             .collect(ProduceRequest {
                 request_id: 6,
                 topic: "example-topic-two".to_string(),
-                partition: 2,
+                partition: Vec::from(&2_u8.to_be_bytes()),
                 data: "example-topic-two-partition-two-first".as_bytes().to_vec(),
             })
             .expect("");
@@ -648,7 +648,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -665,7 +665,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 1,
                 max_partition_fetch_bytes: 0,
             },
@@ -692,7 +692,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 2,
                 max_partition_fetch_bytes: 0,
             },
@@ -719,7 +719,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic-two".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -736,7 +736,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic-two".to_string(),
-                partition: 2,
+                partition: Vec::from(&2_u8.to_be_bytes()),
                 offset: 0,
                 max_partition_fetch_bytes: 0,
             },
@@ -763,7 +763,7 @@ mod tests {
         let consume_response = consume(
             ConsumeRequest {
                 topic: "example-topic-two".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 1,
                 max_partition_fetch_bytes: 0,
             },
@@ -802,7 +802,7 @@ mod tests {
         let result = delete_record(
             riskless::messages::DeleteRecordsRequest {
                 topic: "".to_string(),
-                partition: 1,
+                partition: Vec::from(&1_u8.to_be_bytes()),
                 offset: 0,
             },
             batch_coordinator.clone(),

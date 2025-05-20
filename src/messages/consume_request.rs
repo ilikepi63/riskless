@@ -9,7 +9,7 @@ pub struct ConsumeRequest {
     /// The topic that this request consumes from.
     pub topic: String,
     /// The partition that this request consumes from.
-    pub partition: u64,
+    pub partition: Vec<u8>,
     /// The offset from which this request consumes from.
     pub offset: u64,
     /// The maximum amount of bytes to retrieve from a partition.

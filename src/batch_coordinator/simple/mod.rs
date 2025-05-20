@@ -55,11 +55,14 @@ impl SimpleBatchCoordinator {
     }
 
     /// Retrieves the directory of the given topic/partition.
-    fn partition_index_file_from_topic_dir(
-        topic_dir: &mut PathBuf,
-        partition: u64,
-    ) -> &mut PathBuf {
-        topic_dir.push(format!("{:0>20}.index", partition.to_string()));
+    fn partition_index_file_from_topic_dir<'a>(
+        topic_dir: &'a mut PathBuf,
+        partition: &'a [u8],
+    ) -> &'a mut PathBuf {
+        topic_dir.push(format!(
+            "{:0>20}.index",
+            partition.iter().map(|b| b.to_string()).collect::<String>()
+        ));
 
         (topic_dir) as _
     }
@@ -105,7 +108,7 @@ impl CommitFile for SimpleBatchCoordinator {
 
             let current_partition_file = Self::partition_index_file_from_topic_dir(
                 &mut current_topic_dir,
-                batch.topic_id_partition.1,
+                &batch.topic_id_partition.1,
             );
 
             let file = Self::open_or_create_file(current_partition_file);
@@ -162,7 +165,7 @@ impl FindBatches for SimpleBatchCoordinator {
 
             let current_partition_file = Self::partition_index_file_from_topic_dir(
                 &mut current_topic_dir,
-                request.topic_id_partition.1,
+                &request.topic_id_partition.1,
             );
 
             let file = Self::open_file(current_partition_file);
@@ -383,10 +386,10 @@ mod tests {
     #[test]
     fn test_partition_index_file_from_topic_dir() {
         let mut topic_dir = PathBuf::from("test_topic");
-        let partition = 42;
+        let partition = Vec::from(&42_u8.to_be_bytes());
 
         let result =
-            SimpleBatchCoordinator::partition_index_file_from_topic_dir(&mut topic_dir, partition);
+            SimpleBatchCoordinator::partition_index_file_from_topic_dir(&mut topic_dir, &partition);
 
         assert_eq!(
             result.to_str().expect(""),
@@ -461,11 +464,11 @@ mod tests {
         let whole_dir = temp_dir.clone();
 
         let topic = "test_topic".to_string();
-        let partition = 1;
+        let partition = Vec::from(&1_u8.to_be_bytes());
 
         let object_key = Uuid::new_v4().into_bytes();
         let batches = vec![CommitBatchRequest {
-            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            topic_id_partition: TopicIdPartition(topic.clone(), partition.clone()),
             byte_offset: 0,
             size: 100,
             request_id: 1,
@@ -479,9 +482,10 @@ mod tests {
             last_sequence: 0,
         }];
 
-        let expected_file_path = temp_dir
-            .join(&topic)
-            .join(format!("{:0>20}.index", partition));
+        let expected_file_path = temp_dir.join(&topic).join(format!(
+            "{:0>20}.index",
+            partition.iter().map(|b| b.to_string()).collect::<String>()
+        ));
 
         // File shouldn't exist yet
         assert!(!expected_file_path.exists());
@@ -518,7 +522,7 @@ mod tests {
         let _ = std::fs::create_dir(index_path);
 
         let topic = "test_topic".to_string();
-        let partition = 1;
+        let partition = Vec::from(&1_u8.to_be_bytes());
 
         // First, create an index file with some data
         let object_key = Uuid::new_v4().into_bytes();
@@ -526,7 +530,7 @@ mod tests {
         let size = 100;
 
         let batches = vec![CommitBatchRequest {
-            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            topic_id_partition: TopicIdPartition(topic.clone(), partition.clone()),
             byte_offset: offset,
             size,
             request_id: 1,
@@ -582,7 +586,7 @@ mod tests {
         let _ = std::fs::create_dir(&index_path);
 
         let topic = "test_topic".to_string();
-        let partition = 1;
+        let partition = Vec::from(&1_u8.to_be_bytes());
 
         // First, create an index file with some data
         let object_key = Uuid::new_v4().into_bytes();
@@ -591,7 +595,7 @@ mod tests {
         let size = 100;
 
         let batches = vec![CommitBatchRequest {
-            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            topic_id_partition: TopicIdPartition(topic.clone(), partition.clone()),
             byte_offset: offset,
             size,
             request_id: 1,
@@ -608,7 +612,7 @@ mod tests {
         coordinator.commit_file(object_key, 1, 100, batches).await;
 
         let batches = vec![CommitBatchRequest {
-            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            topic_id_partition: TopicIdPartition(topic.clone(), partition.clone()),
             byte_offset: 1,
             size,
             request_id: 1,
@@ -627,7 +631,7 @@ mod tests {
             .await;
 
         let batches = vec![CommitBatchRequest {
-            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            topic_id_partition: TopicIdPartition(topic.clone(), partition.clone()),
             byte_offset: 1,
             size,
             request_id: 2,
@@ -649,7 +653,10 @@ mod tests {
 
         index_path.push(&topic);
 
-        index_path.push(format!("{:0>20}.index", partition.to_string()));
+        index_path.push(format!(
+            "{:0>20}.index",
+            partition.iter().map(|b| b.to_string()).collect::<String>()
+        ));
 
         let data = std::fs::read(index_path)?;
 
@@ -657,7 +664,7 @@ mod tests {
 
         // Now try to find the batch
         let find_requests = vec![FindBatchRequest {
-            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            topic_id_partition: TopicIdPartition(topic.clone(), partition.clone()),
             offset,
             max_partition_fetch_bytes: 1024,
         }];
@@ -675,7 +682,7 @@ mod tests {
         assert_eq!(batch.metadata.byte_size, size);
 
         let find_requests = vec![FindBatchRequest {
-            topic_id_partition: TopicIdPartition(topic.clone(), partition),
+            topic_id_partition: TopicIdPartition(topic.clone(), partition.clone()),
             offset: 1,
             max_partition_fetch_bytes: 1024,
         }];
@@ -706,7 +713,10 @@ mod tests {
         let coordinator = SimpleBatchCoordinator::new(temp_dir.to_str().expect("").to_string());
 
         let find_requests = vec![FindBatchRequest {
-            topic_id_partition: TopicIdPartition("nonexistent_topic".to_string(), 1),
+            topic_id_partition: TopicIdPartition(
+                "nonexistent_topic".to_string(),
+                Vec::from(&1_u8.to_be_bytes()),
+            ),
             offset: 0,
             max_partition_fetch_bytes: 1024,
         }];

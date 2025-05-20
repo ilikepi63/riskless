@@ -100,7 +100,7 @@ impl TryFrom<ProduceRequestCollection> for SharedLogSegment {
 
                 batch_coords.push(BatchCoordinate {
                     topic: req.topic.clone(),
-                    partition: req.partition,
+                    partition: req.partition.clone(),
                     base_offset,
                     offset,
                     size: size.try_into()?,
@@ -149,7 +149,7 @@ mod tests {
         collection.collect(ProduceRequest {
             request_id: 1,
             topic: "test".to_string(),
-            partition: 0,
+            partition: Vec::from(&0_u8.to_be_bytes()),
             data: vec![1, 2, 3],
         })?;
 
@@ -162,7 +162,7 @@ mod tests {
 
         let coord = &segment.0[0];
         assert_eq!(coord.topic, "test");
-        assert_eq!(coord.partition, 0);
+        assert_eq!(coord.partition, Vec::from(&0_u8.to_be_bytes()));
         assert_eq!(
             coord.base_offset,
             SharedLogSegmentHeaderV1::size().try_into().expect("")
@@ -191,14 +191,14 @@ mod tests {
         collection.collect(ProduceRequest {
             request_id: 1,
             topic: "test".to_string(),
-            partition: 0,
+            partition: Vec::from(&0_u8.to_be_bytes()),
             data: vec![1, 2, 3],
         })?;
 
         collection.collect(ProduceRequest {
             request_id: 2,
             topic: "test".to_string(),
-            partition: 0,
+            partition: Vec::from(&0_u8.to_be_bytes()),
             data: vec![4, 5],
         })?;
 
@@ -206,7 +206,7 @@ mod tests {
         collection.collect(ProduceRequest {
             request_id: 3,
             topic: "test".to_string(),
-            partition: 1,
+            partition: Vec::from(&1_u8.to_be_bytes()),
             data: vec![6, 7, 8, 9],
         })?;
 
@@ -250,7 +250,7 @@ mod tests {
         let request = ProduceRequest {
             request_id: 1,
             topic: "large".to_string(),
-            partition: 0,
+            partition: Vec::from(&0_u8.to_be_bytes()),
             data: large_data.clone(),
         };
         collection.collect(request)?;

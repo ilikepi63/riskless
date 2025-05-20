@@ -11,7 +11,7 @@ pub struct ConsumeBatch {
     /// The topic of the record.
     pub topic: String,
     /// Partition of a record.
-    pub partition: u64,
+    pub partition: Vec<u8>,
     /// The offset of this record.
     pub offset: u64,
     /// The maximum amount of bytes to retrieve from each partition.
@@ -46,7 +46,7 @@ impl TryFrom<(FindBatchResponse, &BatchInfo, &Bytes)> for ConsumeBatch {
 
         let batch = ConsumeBatch {
             topic: batch_info.metadata.topic_id_partition.0.clone(),
-            partition: batch_info.metadata.topic_id_partition.1,
+            partition: batch_info.metadata.topic_id_partition.1.clone(),
             offset: find_batch_response.log_start_offset,
             max_partition_fetch_bytes: 0,
             data,

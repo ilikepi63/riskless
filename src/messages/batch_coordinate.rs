@@ -6,7 +6,7 @@ pub struct BatchCoordinate {
     /// The topic for this record.
     pub topic: String,
     /// The partition for this record.
-    pub partition: u64,
+    pub partition: Vec<u8>,
     /// The base_offset inside of the file at which this record exists.
     pub base_offset: u64,
     /// The offset at which this record exists.
