@@ -163,6 +163,9 @@ pub async fn consume(
                                     .filter(|batch| batch.object_key == *object_name)
                                     .map(|batch| (res.clone(), batch))
                             })
+                            .inspect(|val| {
+                                tracing::trace!("Result returned for query: {:#?}", val);
+                            })
                             .filter_map(|(res, batch)| {
                                 ConsumeBatch::try_from((res, batch, &b)).ok()
                             })
@@ -170,11 +173,19 @@ pub async fn consume(
 
                         batch_responses_for_object
                     } else {
+                        tracing::trace!(
+                            "Could not retrieve bytes for given GetObject query: {}",
+                            object_name
+                        );
                         vec![]
                     }
                 }
-                Err(_err) => {
-                    // TODO: How are we going to handle errors here?
+                Err(err) => {
+                    tracing::error!(
+                        "An error occurred trying to retrieve the object with key {}. Error: {:#?}",
+                        object_name,
+                        err
+                    );
                     vec![]
                 }
             };
@@ -186,6 +197,8 @@ pub async fn consume(
                 {
                     tracing::error!("Failed to send consume response: {:#?}", e);
                 };
+            } else {
+                tracing::trace!("No ConsumeBatches found for query.");
             };
         });
     }
