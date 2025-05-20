@@ -14,7 +14,7 @@ use crate::messages::CommitBatchRequest;
 
 /// Merged Topic/Partition identification struc .
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Default)]
-pub struct TopicIdPartition(pub String, pub u64);
+pub struct TopicIdPartition(pub String, pub Vec<u8>);
 
 /// The type of the timestamp given.
 #[derive(Debug, Default, Clone)]

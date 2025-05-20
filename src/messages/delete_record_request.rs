@@ -6,7 +6,7 @@ pub struct DeleteRecordsRequest {
     /// The topic of the record.
     pub topic: String,
     /// Partition of a record.
-    pub partition: u64,
+    pub partition: Vec<u8>,
     /// The offset of this record.
     pub offset: u64,
 }

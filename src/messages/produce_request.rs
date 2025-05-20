@@ -12,7 +12,7 @@ pub struct ProduceRequest {
     /// The topic to which this data will be produced.
     pub topic: String,
     /// The partition on which this data will be produced.
-    pub partition: u64,
+    pub partition: Vec<u8>,
     /// The data that will be added to the partition.
     pub data: Vec<u8>,
 }
@@ -60,7 +60,7 @@ impl ProduceRequestCollection {
 
     /// Collect a produce request into this struct.
     pub fn collect(&self, req: ProduceRequest) -> RisklessResult<()> {
-        let topic_id_partition = TopicIdPartition(req.topic.clone(), req.partition);
+        let topic_id_partition = TopicIdPartition(req.topic.clone(), req.partition.clone());
 
         let entry = self.inner.entry(topic_id_partition);
 

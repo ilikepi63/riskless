@@ -39,7 +39,7 @@ impl From<&BatchCoordinate> for CommitBatchRequest {
         // Everything that is defaulted is unknown for now.
         CommitBatchRequest {
             request_id: value.request.request_id,
-            topic_id_partition: TopicIdPartition(value.topic.clone(), value.partition),
+            topic_id_partition: TopicIdPartition(value.topic.clone(), value.partition.clone()),
             byte_offset: value.offset,
             size: value.size,
             base_offset: value.base_offset,

@@ -17,7 +17,7 @@ async fn main() {
     col.collect(ProduceRequest {
         request_id: 1,
         topic: "example-topic".to_string(),
-        partition: 1,
+        partition: Vec::from(&1_u8.to_be_bytes()),
         data: "hello".as_bytes().to_vec(),
     })
     .expect("");
@@ -31,7 +31,7 @@ async fn main() {
     let consume_response = consume(
         ConsumeRequest {
             topic: "example-topic".to_string(),
-            partition: 1,
+            partition: Vec::from(&1_u8.to_be_bytes()),
             offset: 0,
             max_partition_fetch_bytes: 0,
         },
