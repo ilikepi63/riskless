@@ -136,6 +136,11 @@ pub async fn consume(
         .map(|batch_info| batch_info.object_key)
         .collect::<HashSet<_>>();
 
+    // Check to ensure we don't break the below.
+    if objects_to_retrieve.len() < 1 {
+        return Ok(tokio::sync::mpsc::channel(1).1);
+    }
+
     // We create a
     let (batch_response_tx, batch_reponse_rx) =
         tokio::sync::mpsc::channel(objects_to_retrieve.len());
