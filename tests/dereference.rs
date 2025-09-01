@@ -13,9 +13,9 @@ async fn await_all_receiver<T>(mut recv: tokio::sync::mpsc::Receiver<T>) -> Vec<
 mod tests {
 
     use riskless::batch_coordinator::simple::SimpleBatchCoordinator;
-    use riskless::messages::ConsumeRequest;
-    use riskless::get_refs;
     use riskless::dereference;
+    use riskless::get_refs;
+    use riskless::messages::ConsumeRequest;
     use riskless::messages::{ProduceRequest, ProduceRequestCollection};
     use riskless::{consume, delete_record, flush, scan_and_permanently_delete_records};
     use std::path::PathBuf;
