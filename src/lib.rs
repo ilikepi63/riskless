@@ -70,6 +70,8 @@ pub use object_store;
 use object_store::{ObjectStore, PutPayload, path::Path};
 use shared_log_segment::SharedLogSegment;
 
+use crate::batch_coordinator::FindBatchResponse;
+
 /// Flush the ProduceRequestCollection to the ObjectStore/BatchCoordinator.
 pub async fn flush(
     reqs: ProduceRequestCollection,
@@ -111,6 +113,103 @@ pub async fn flush(
         .iter()
         .map(ProduceResponse::from)
         .collect::<Vec<_>>())
+}
+
+/// Retrieves the References to the underlying values.
+///
+/// These references are further dereferenced to retrieve the value.
+pub async fn get_refs(
+    requests: Vec<ConsumeRequest>,
+    batch_coordinator: Arc<dyn FindBatches>,
+) -> RisklessResult<Vec<FindBatchResponse>> {
+    Ok(batch_coordinator
+        .find_batches(
+            requests
+                .iter()
+                .map(|request| FindBatchRequest {
+                    topic_id_partition: TopicIdPartition(
+                        request.topic.clone(),
+                        request.partition.clone(),
+                    ),
+                    offset: request.offset,
+                    max_partition_fetch_bytes: 0,
+                })
+                .collect(),
+            0,
+        )
+        .await)
+}
+
+/// Dereference a FindBatchResponse value into the underlying value.
+///
+/// This will return a future, where polling fetches the underlying data for the offset/topic/partition.
+pub async fn dereference(
+    request: FindBatchResponse,
+    object_storage: Arc<dyn ObjectStore>,
+) -> RisklessResult<Vec<impl Future<Output = ConsumeResponse>>> {
+    // Retrieve the names of all objects that are included in this FindBatchResponse.
+    let objects_to_retrieve = request
+        .batches
+        .iter()
+        .map(|batch_info| batch_info.object_key.clone())
+        .collect::<HashSet<_>>();
+
+    // Retrieve a list of futures that when acted upon retrieve the underlying data.
+    let futures = objects_to_retrieve.iter().map(|object_name| {
+        // Cloning for move semantics.
+        let object_name = object_name.clone();
+        let object_store = object_storage.clone();
+        let request = request.clone();
+
+
+        async move {
+            // Retrieve the object from object storage.
+            let get_object_result = object_store.get(&Path::from(object_name.as_str())).await;
+
+                let result = match get_object_result {
+
+                    Ok(get_result) => {
+                        get_result.bytes().await.map(|b| {
+                            // Retrieve the current fetch Responses by name.
+                                let batch_responses_for_object = request.batches
+                                        .iter()
+                                        .filter(|batch| batch.object_key == *object_name)
+                                        .map(|batch| (request.clone(), batch))
+                                .filter_map(|(res, batch)| {
+                                    ConsumeBatch::try_from((res, batch, &b)).ok()
+                                })
+                                .collect::<Vec<_>>();
+
+                            batch_responses_for_object
+
+                        }).unwrap_or_else(|_| {
+                            tracing::trace!(
+                                "Could not retrieve bytes for given GetObject query: {}",
+                                object_name
+                            );
+                            vec![]
+
+                        })
+
+                }
+                Err(err) => {
+                    tracing::error!(
+                        "An error occurred trying to retrieve the object with key {}. Error: {:#?}",
+                        object_name,
+                        err
+                    );
+                    vec![]
+                }
+            };
+
+
+            ConsumeResponse{batches: result}
+
+        }
+
+    }).collect();
+
+    Ok(futures)
 }
 
 /// Handles a consume request by retrieving messages from object storage.
