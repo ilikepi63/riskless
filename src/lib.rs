@@ -70,6 +70,8 @@ pub use object_store;
 use object_store::{ObjectStore, PutPayload, path::Path};
 use shared_log_segment::SharedLogSegment;
 
+use crate::batch_coordinator::FindBatchResponse;
+
 /// Flush the ProduceRequestCollection to the ObjectStore/BatchCoordinator.
 pub async fn flush(
     reqs: ProduceRequestCollection,
@@ -111,6 +113,25 @@ pub async fn flush(
         .iter()
         .map(ProduceResponse::from)
         .collect::<Vec<_>>())
+}
+
+/// Retrieves the References to the underlying values. 
+/// 
+/// These references are further dereferenced to retrieve the value. 
+pub async fn get_refs(
+    requests: Vec<ConsumeRequest>,
+    batch_coordinator: Arc<dyn FindBatches>,
+) -> RisklessResult<Vec<FindBatchResponse>> {
+    Ok(batch_coordinator
+        .find_batches(
+            requests.iter().map(|request| FindBatchRequest {
+                topic_id_partition: TopicIdPartition(request.topic.clone(), request.partition.clone()),
+                offset: request.offset,
+                max_partition_fetch_bytes: 0,
+            }).collect(),
+            0,
+        )
+        .await)
 }
 
 /// Handles a consume request by retrieving messages from object storage.
